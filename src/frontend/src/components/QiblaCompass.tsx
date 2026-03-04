@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Coordinates, Qibla } from "adhan";
-import { Compass, MapPin, Navigation, RefreshCw } from "lucide-react";
+import { Compass, MapPin, Navigation, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const MECCA_LAT = 21.3891;
 const MECCA_LNG = 39.857;
@@ -220,6 +221,8 @@ export default function QiblaTab() {
   const [locationError, setLocationError] = useState(false);
   const [manualLat, setManualLat] = useState("");
   const [manualLng, setManualLng] = useState("");
+  const [citySearch, setCitySearch] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [sensorAvailable, setSensorAvailable] = useState(false);
   const animFrameRef = useRef<number | null>(null);
 
@@ -233,6 +236,12 @@ export default function QiblaTab() {
   }, []);
 
   const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      setIsLoading(false);
+      toast.error("Геолокация не поддерживается вашим браузером");
+      return;
+    }
     setIsLoading(true);
     setLocationError(false);
     navigator.geolocation.getCurrentPosition(
@@ -242,11 +251,18 @@ export default function QiblaTab() {
         computeQibla(lat, lng);
         setIsLoading(false);
       },
-      () => {
+      (err) => {
         setLocationError(true);
         setIsLoading(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error(
+            "Доступ к геолокации запрещён. Разрешите доступ в браузере или введите координаты вручную.",
+          );
+        } else {
+          toast.error("Не удалось определить местоположение.");
+        }
       },
-      { timeout: 10000 },
+      { timeout: 15000, enableHighAccuracy: false, maximumAge: 60000 },
     );
   }, [computeQibla]);
 
@@ -302,6 +318,34 @@ export default function QiblaTab() {
     setIsLoading(false);
   };
 
+  const handleCitySearch = useCallback(async () => {
+    const query = citySearch.trim();
+    if (!query) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+        { headers: { "Accept-Language": "ru" } },
+      );
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        toast.error("Город или страна не найдены");
+        return;
+      }
+      const result = data[0];
+      const lat = Number.parseFloat(result.lat);
+      const lng = Number.parseFloat(result.lon);
+      computeQibla(lat, lng);
+      setLocationError(false);
+      setIsLoading(false);
+      setCitySearch("");
+    } catch {
+      toast.error("Ошибка поиска. Проверьте интернет-соединение");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [citySearch, computeQibla]);
+
   return (
     <div className="flex flex-col items-center px-4 py-4">
       {/* Title */}
@@ -327,33 +371,75 @@ export default function QiblaTab() {
       {/* Location error */}
       {locationError && !isLoading && (
         <div
-          className="w-full glass-card rounded-xl p-4 mb-4 border border-destructive/40"
+          className="w-full glass-card rounded-xl p-4 mb-4 border border-red-500/30 space-y-3"
           data-ocid="qibla.error_state"
         >
-          <p className="text-sm text-foreground/70 mb-3">
-            Геолокация недоступна. Введите координаты:
+          <p className="text-sm text-red-400 font-medium">
+            Геолокация недоступна
           </p>
-          <div className="flex gap-2 mb-2">
+          <p className="text-xs text-foreground/60">
+            Разрешите доступ к геолокации в браузере, или найдите город:
+          </p>
+          {/* City search */}
+          <div className="flex gap-2">
             <Input
-              placeholder="Широта"
-              value={manualLat}
-              onChange={(e) => setManualLat(e.target.value)}
-              className="bg-secondary border-border text-foreground text-sm"
+              placeholder="Поиск города или страны..."
+              value={citySearch}
+              onChange={(e) => setCitySearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCitySearch()}
+              className="bg-secondary border-border text-foreground text-xs h-9"
+              data-ocid="qibla.city.search_input"
             />
-            <Input
-              placeholder="Долгота"
-              value={manualLng}
-              onChange={(e) => setManualLng(e.target.value)}
-              className="bg-secondary border-border text-foreground text-sm"
-            />
+            <Button
+              size="sm"
+              className="h-9 px-3 bg-primary text-primary-foreground hover:bg-orange-400 shrink-0"
+              onClick={handleCitySearch}
+              disabled={isSearching || !citySearch.trim()}
+              data-ocid="qibla.city.submit_button"
+            >
+              {isSearching ? (
+                <span className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />
+              ) : (
+                <Search size={13} />
+              )}
+            </Button>
           </div>
           <Button
+            variant="outline"
             size="sm"
-            className="w-full bg-primary text-primary-foreground"
-            onClick={handleManualSubmit}
+            className="w-full text-xs border-orange-500/30 text-orange-300 hover:bg-orange-500/10"
+            onClick={requestLocation}
+            data-ocid="qibla.retry.button"
           >
-            Показать Киблу
+            Повторить геолокацию
           </Button>
+          {/* Manual coords fallback */}
+          <details className="text-xs">
+            <summary className="text-foreground/40 cursor-pointer select-none">
+              Ввести координаты вручную
+            </summary>
+            <div className="flex gap-2 mt-2">
+              <Input
+                placeholder="Широта"
+                value={manualLat}
+                onChange={(e) => setManualLat(e.target.value)}
+                className="bg-secondary border-border text-foreground text-sm"
+              />
+              <Input
+                placeholder="Долгота"
+                value={manualLng}
+                onChange={(e) => setManualLng(e.target.value)}
+                className="bg-secondary border-border text-foreground text-sm"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="w-full mt-2 bg-primary text-primary-foreground"
+              onClick={handleManualSubmit}
+            >
+              Показать Киблу
+            </Button>
+          </details>
         </div>
       )}
 

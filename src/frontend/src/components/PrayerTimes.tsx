@@ -32,7 +32,7 @@ import {
   Search,
   Settings,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PrayerSettings } from "../backend.d";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -150,28 +150,80 @@ export default function PrayerTimesTab() {
     }
   }, [savedSettings]);
 
+  // Reverse geocode: get city name from coords
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`,
+        { headers: { "Accept-Language": "ru" } },
+      );
+      const data = await res.json();
+      if (data?.address) {
+        const city =
+          data.address.city ||
+          data.address.town ||
+          data.address.village ||
+          data.address.county ||
+          data.address.state ||
+          "";
+        const country = data.address.country || "";
+        const name = [city, country].filter(Boolean).join(", ");
+        if (name) return name;
+      }
+    } catch {
+      // ignore, fall back to coords
+    }
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }, []);
+
   // Get geolocation
   const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError(true);
+      setIsLoadingLocation(false);
+      toast.error("Геолокация не поддерживается вашим браузером");
+      return;
+    }
     setIsLoadingLocation(true);
     setLocationError(false);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocationName(
-          `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
-        );
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoords({ lat, lng });
+        const name = await reverseGeocode(lat, lng);
+        setLocationName(name);
         setIsLoadingLocation(false);
       },
-      () => {
+      (err) => {
         setLocationError(true);
         setIsLoadingLocation(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error(
+            "Доступ к геолокации запрещён. Разрешите доступ в настройках браузера или введите город вручную.",
+          );
+        } else if (err.code === err.TIMEOUT) {
+          toast.error("Время ожидания геолокации истекло. Попробуйте ещё раз.");
+        } else {
+          toast.error(
+            "Не удалось определить местоположение. Введите город вручную.",
+          );
+        }
       },
-      { timeout: 10000 },
+      { timeout: 15000, enableHighAccuracy: false, maximumAge: 60000 },
     );
-  }, []);
+  }, [reverseGeocode]);
 
+  const hasTriedAutoLocation = useRef(false);
+
+  // Auto-request location only if no saved location
   useEffect(() => {
-    if (!savedSettings?.latitude) {
+    // Wait for savedSettings to load (it may be undefined initially)
+    if (savedSettings === undefined) return;
+    // If saved coords exist, don't auto-request
+    if (savedSettings?.latitude && savedSettings?.longitude) return;
+    if (!hasTriedAutoLocation.current) {
+      hasTriedAutoLocation.current = true;
       requestLocation();
     }
   }, [savedSettings, requestLocation]);
@@ -433,16 +485,21 @@ export default function PrayerTimesTab() {
           </div>
 
           {/* Current location name */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-            <MapPin size={12} className="text-orange-400 shrink-0" />
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${locationError ? "bg-red-500/5 border-red-500/30" : "bg-white/5 border-white/10"}`}
+          >
+            <MapPin
+              size={12}
+              className={`shrink-0 ${locationError ? "text-red-400" : "text-orange-400"}`}
+            />
             <span className="text-foreground/80 text-xs truncate flex-1">
               {isLoadingLocation ? (
                 <span className="text-foreground/40 italic">
-                  Определение...
+                  Определение местоположения...
                 </span>
               ) : locationError ? (
-                <span className="text-destructive/80">
-                  Геолокация недоступна
+                <span className="text-red-400">
+                  Геолокация недоступна — разрешите доступ или введите город
                 </span>
               ) : (
                 locationName

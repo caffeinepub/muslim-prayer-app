@@ -1,21 +1,42 @@
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { BookOpen, Clock, Compass, LogOut, User } from "lucide-react";
+import { BookOpen, Clock, Compass, User } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import AsmaulHusna from "./components/AsmaulHusna";
 import PrayerTimesTab from "./components/PrayerTimes";
+import ProfileTab, { AvatarCircle } from "./components/ProfileTab";
 import QiblaCompass from "./components/QiblaCompass";
+import QuranTab from "./components/QuranTab";
+import RamadanTab from "./components/RamadanTab";
 import TasbihTab from "./components/Tasbih";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
 
-type TabId = "prayer" | "qibla" | "tasbih" | "names";
+type TabId = "prayer" | "qibla" | "tasbih" | "quran" | "ramadan" | "profile";
 
 interface NavTab {
   id: TabId;
   label: string;
   icon: React.ReactNode;
   ocid: string;
+  isCenter?: boolean;
+}
+
+// Crescent moon icon for Ramadan center button
+function CrescentIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-label="Рамадан"
+      role="img"
+    >
+      <title>Рамадан</title>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
 }
 
 const TABS: NavTab[] = [
@@ -30,6 +51,13 @@ const TABS: NavTab[] = [
     label: "Кибла",
     icon: <Compass size={20} />,
     ocid: "nav.qibla.tab",
+  },
+  {
+    id: "ramadan",
+    label: "Рамадан",
+    icon: <CrescentIcon size={22} />,
+    ocid: "nav.ramadan.tab",
+    isCenter: true,
   },
   {
     id: "tasbih",
@@ -61,10 +89,16 @@ const TABS: NavTab[] = [
     ocid: "nav.tasbih.tab",
   },
   {
-    id: "names",
-    label: "99 имён",
+    id: "quran",
+    label: "Коран",
     icon: <BookOpen size={20} />,
-    ocid: "nav.names.tab",
+    ocid: "nav.quran.tab",
+  },
+  {
+    id: "profile",
+    label: "Профиль",
+    icon: <User size={20} />,
+    ocid: "nav.profile.tab",
   },
 ];
 
@@ -76,10 +110,18 @@ const pageVariants = {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("prayer");
-  const { login, clear, loginStatus, identity, isInitializing } =
-    useInternetIdentity();
-  const isLoggedIn = !!identity;
-  const isLoggingIn = loginStatus === "logging-in";
+  const { isInitializing, identity } = useInternetIdentity();
+  const { user: supabaseUser, profile } = useSupabaseAuth();
+
+  const isLoggedIn = !!identity || !!supabaseUser;
+
+  // Derive display name for avatar
+  const displayName =
+    profile?.name ||
+    (supabaseUser?.email ? supabaseUser.email.split("@")[0] : null) ||
+    (identity ? "II" : null) ||
+    "";
+  const displayEmail = supabaseUser?.email || "";
 
   const renderTab = () => {
     switch (activeTab) {
@@ -89,8 +131,12 @@ export default function App() {
         return <QiblaCompass />;
       case "tasbih":
         return <TasbihTab />;
-      case "names":
-        return <AsmaulHusna />;
+      case "quran":
+        return <QuranTab />;
+      case "ramadan":
+        return <RamadanTab />;
+      case "profile":
+        return <ProfileTab />;
       default:
         return <PrayerTimesTab />;
     }
@@ -127,43 +173,31 @@ export default function App() {
           </div>
         </div>
 
-        {/* Auth */}
+        {/* Auth area */}
         {isInitializing ? (
-          <div className="w-20 h-8 rounded-lg bg-secondary animate-pulse" />
+          <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
         ) : isLoggedIn ? (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
-              <User size={12} className="text-orange-400" />
-              <span className="text-xs text-orange-400 font-medium">
-                Войдено
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-foreground/40 hover:text-foreground"
-              onClick={clear}
-              title="Выйти"
-            >
-              <LogOut size={14} />
-            </Button>
-          </div>
+          // Clickable avatar → go to profile tab
+          <button
+            type="button"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 rounded-full"
+            onClick={() => setActiveTab("profile")}
+            title="Профиль"
+            data-ocid="nav.profile.tab"
+          >
+            <AvatarCircle name={displayName} email={displayEmail} size="sm" />
+          </button>
         ) : (
+          // Not logged in: user icon → profile tab
           <Button
-            size="sm"
-            className="bg-primary text-primary-foreground hover:bg-orange-400 h-8 px-3 text-xs font-semibold"
-            onClick={login}
-            disabled={isLoggingIn}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-foreground/50 hover:text-orange-400 hover:bg-orange-500/10"
+            onClick={() => setActiveTab("profile")}
+            title="Войти"
             data-ocid="auth.login.button"
           >
-            {isLoggingIn ? (
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 border-2 border-primary-foreground/50 border-t-primary-foreground rounded-full animate-spin" />
-                Вход...
-              </span>
-            ) : (
-              "Войти"
-            )}
+            <User size={16} />
           </Button>
         )}
       </header>
@@ -189,6 +223,37 @@ export default function App() {
         <div className="flex items-stretch h-16">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.id;
+            if (tab.isCenter) {
+              return (
+                <button
+                  type="button"
+                  key={tab.id}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-200 focus-visible:outline-none"
+                  onClick={() => setActiveTab(tab.id)}
+                  data-ocid={tab.ocid}
+                >
+                  {/* Center elevated button */}
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 mb-0.5 ${
+                      isActive
+                        ? "bg-orange-500 text-white scale-105 shadow-orange-500/40"
+                        : "bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25"
+                    }`}
+                    style={{ marginTop: "-14px" }}
+                  >
+                    {tab.icon}
+                  </div>
+                  <span
+                    className={`text-[9px] font-medium transition-all duration-200 ${
+                      isActive ? "text-orange-400" : "text-foreground/30"
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            }
+
             return (
               <button
                 type="button"
