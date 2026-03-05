@@ -212,6 +212,22 @@ function drawCompass(
   ctx.restore();
 }
 
+// Read saved location from shared localStorage key
+function readStoredLocationQibla(): { lat: number; lng: number } | null {
+  try {
+    const stored = localStorage.getItem("prayer_location");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.lat && parsed.lng) {
+        return { lat: parsed.lat, lng: parsed.lng };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export default function QiblaTab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qiblaAngle, setQiblaAngle] = useState<number | null>(null);
@@ -250,6 +266,27 @@ export default function QiblaTab() {
         const lng = pos.coords.longitude;
         computeQibla(lat, lng);
         setIsLoading(false);
+        // Save to shared localStorage so other tabs can reuse it
+        try {
+          const existingName = (() => {
+            try {
+              const s = localStorage.getItem("prayer_location");
+              return s ? JSON.parse(s).name : null;
+            } catch {
+              return null;
+            }
+          })();
+          localStorage.setItem(
+            "prayer_location",
+            JSON.stringify({
+              lat,
+              lng,
+              name: existingName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            }),
+          );
+        } catch {
+          // ignore
+        }
       },
       (err) => {
         setLocationError(true);
@@ -266,9 +303,16 @@ export default function QiblaTab() {
     );
   }, [computeQibla]);
 
+  // On mount: try localStorage first, only request geolocation if nothing cached
   useEffect(() => {
-    requestLocation();
-  }, [requestLocation]);
+    const stored = readStoredLocationQibla();
+    if (stored) {
+      computeQibla(stored.lat, stored.lng);
+      setIsLoading(false);
+    } else {
+      requestLocation();
+    }
+  }, [computeQibla, requestLocation]);
 
   // Device orientation
   useEffect(() => {
@@ -316,6 +360,18 @@ export default function QiblaTab() {
     computeQibla(lat, lng);
     setLocationError(false);
     setIsLoading(false);
+    try {
+      localStorage.setItem(
+        "prayer_location",
+        JSON.stringify({
+          lat,
+          lng,
+          name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        }),
+      );
+    } catch {
+      // ignore
+    }
   };
 
   const handleCitySearch = useCallback(async () => {
@@ -335,10 +391,21 @@ export default function QiblaTab() {
       const result = data[0];
       const lat = Number.parseFloat(result.lat);
       const lng = Number.parseFloat(result.lon);
+      const parts = (result.display_name as string).split(",").slice(0, 2);
+      const name = parts.join(",").trim();
       computeQibla(lat, lng);
       setLocationError(false);
       setIsLoading(false);
       setCitySearch("");
+      // Save to shared localStorage
+      try {
+        localStorage.setItem(
+          "prayer_location",
+          JSON.stringify({ lat, lng, name }),
+        );
+      } catch {
+        // ignore
+      }
     } catch {
       toast.error("Ошибка поиска. Проверьте интернет-соединение");
     } finally {

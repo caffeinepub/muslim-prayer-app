@@ -8,7 +8,7 @@ import {
   PrayerTimes,
 } from "adhan";
 import { Clock, Locate, MapPin, Moon, Search, Star, Sun } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 function formatTime(date: Date | null): string {
@@ -63,21 +63,35 @@ export default function RamadanTab() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
-  const [locationName, setLocationName] = useState(
-    "Определение местоположения...",
-  );
+  const [locationName, setLocationName] = useState("Не определено");
   const [locationError, setLocationError] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [now, setNow] = useState(new Date());
   const [citySearch, setCitySearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const hasTriedAuto = useRef(false);
 
   // Tick
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Load saved location from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("prayer_location");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.lat && parsed.lng) {
+          setCoords({ lat: parsed.lat, lng: parsed.lng });
+          setLocationName(parsed.name || "Сохранённое местоположение");
+          setLocationError(false);
+        }
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
@@ -122,6 +136,15 @@ export default function RamadanTab() {
         const name = await reverseGeocode(lat, lng);
         setLocationName(name);
         setIsLoadingLocation(false);
+        // Save to localStorage so it persists
+        try {
+          localStorage.setItem(
+            "prayer_location",
+            JSON.stringify({ lat, lng, name }),
+          );
+        } catch {
+          // ignore
+        }
       },
       (err) => {
         setLocationError(true);
@@ -135,13 +158,6 @@ export default function RamadanTab() {
       { timeout: 15000, enableHighAccuracy: false, maximumAge: 60000 },
     );
   }, [reverseGeocode]);
-
-  useEffect(() => {
-    if (!hasTriedAuto.current) {
-      hasTriedAuto.current = true;
-      requestLocation();
-    }
-  }, [requestLocation]);
 
   const handleCitySearch = useCallback(async () => {
     const query = citySearch.trim();
@@ -159,14 +175,23 @@ export default function RamadanTab() {
       }
       const result = data[0];
       const parts = (result.display_name as string).split(",").slice(0, 2);
-      setCoords({
-        lat: Number.parseFloat(result.lat),
-        lng: Number.parseFloat(result.lon),
-      });
-      setLocationName(parts.join(",").trim());
+      const lat = Number.parseFloat(result.lat);
+      const lng = Number.parseFloat(result.lon);
+      const name = parts.join(",").trim();
+      setCoords({ lat, lng });
+      setLocationName(name);
       setLocationError(false);
       setIsLoadingLocation(false);
       setCitySearch("");
+      // Save to localStorage for persistence
+      try {
+        localStorage.setItem(
+          "prayer_location",
+          JSON.stringify({ lat, lng, name }),
+        );
+      } catch {
+        // ignore
+      }
     } catch {
       toast.error("Ошибка поиска");
     } finally {
@@ -526,6 +551,23 @@ export default function RamadanTab() {
             дуа
           </li>
         </ul>
+      </div>
+
+      {/* Important notice */}
+      <div className="glass-card rounded-2xl p-4 mb-4 border border-orange-500/40 bg-orange-500/5">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center mt-0.5">
+            <span className="text-orange-400 text-xs font-bold">!</span>
+          </div>
+          <div className="space-y-1">
+            <div className="text-orange-400 font-bold text-sm">Важно!</div>
+            <p className="text-foreground/60 text-xs leading-relaxed">
+              Некоторые времена намаза или Рамадана могут не совпадать до
+              точности и могут отличаться на 5–10 минут. Рекомендуем сверяться с
+              местными имамами или официальным расписанием вашего города.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

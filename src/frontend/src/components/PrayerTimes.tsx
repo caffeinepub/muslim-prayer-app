@@ -104,22 +104,66 @@ function formatCountdown(ms: number): string {
   return [h, m, s].map((v) => String(v).padStart(2, "0")).join(":");
 }
 
+// Helper to read saved location from localStorage
+function readStoredLocation(): {
+  lat: number;
+  lng: number;
+  name: string;
+} | null {
+  try {
+    const stored = localStorage.getItem("prayer_location");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed.lat && parsed.lng) {
+        return {
+          lat: parsed.lat,
+          lng: parsed.lng,
+          name: parsed.name || "Сохранённое местоположение",
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+// Helper to save location to localStorage
+function saveStoredLocation(lat: number, lng: number, name: string) {
+  try {
+    localStorage.setItem("prayer_location", JSON.stringify({ lat, lng, name }));
+  } catch {
+    // ignore
+  }
+}
+
 export default function PrayerTimesTab() {
+  // Initialize coords directly from localStorage so they never flash empty
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null,
+    () => {
+      const stored = readStoredLocation();
+      return stored ? { lat: stored.lat, lng: stored.lng } : null;
+    },
   );
-  const [locationName, setLocationName] = useState(
-    "Определение местоположения...",
-  );
+  const [locationName, setLocationName] = useState<string>(() => {
+    const stored = readStoredLocation();
+    return stored ? stored.name : "Не определено";
+  });
   const [locationError, setLocationError] = useState(false);
   const [calcMethod, setCalcMethod] = useState("MWL");
   const [madhab, setMadhab] = useState("Shafi");
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [now, setNow] = useState(new Date());
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  // Only show prompt when there's no coords at all (not in localStorage)
+  const [showLocationPrompt, setShowLocationPrompt] = useState<boolean>(() => {
+    return readStoredLocation() === null;
+  });
   const [citySearch, setCitySearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  // Track whether we've applied localStorage data to avoid re-showing prompt
+  const localStorageApplied = useRef(readStoredLocation() !== null);
 
   const { identity } = useInternetIdentity();
   const isLoggedIn = !!identity;
@@ -132,20 +176,33 @@ export default function PrayerTimesTab() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load saved settings
+  // Load backend settings — only update if no localStorage data exists
   useEffect(() => {
-    if (savedSettings) {
-      setCalcMethod(savedSettings.calculationMethod);
-      setMadhab(savedSettings.madhab);
+    if (savedSettings === undefined) return;
+    if (savedSettings === null) {
+      // Backend has no settings — only show prompt if localStorage is also empty
+      if (!localStorageApplied.current) {
+        setShowLocationPrompt(true);
+      }
+      return;
+    }
+    // Apply method/madhab settings from backend always
+    setCalcMethod(savedSettings.calculationMethod);
+    setMadhab(savedSettings.madhab);
+    // Only apply coords from backend if localStorage has nothing
+    if (!localStorageApplied.current) {
       if (savedSettings.latitude && savedSettings.longitude) {
-        setCoords({
-          lat: savedSettings.latitude,
-          lng: savedSettings.longitude,
-        });
-        setLocationName(
-          savedSettings.locationName || "Сохранённое местоположение",
-        );
+        const lat = savedSettings.latitude;
+        const lng = savedSettings.longitude;
+        const name = savedSettings.locationName || "Сохранённое местоположение";
+        setCoords({ lat, lng });
+        setLocationName(name);
+        saveStoredLocation(lat, lng, name);
+        localStorageApplied.current = true;
         setIsLoadingLocation(false);
+        setShowLocationPrompt(false);
+      } else {
+        setShowLocationPrompt(true);
       }
     }
   }, [savedSettings]);
@@ -181,11 +238,13 @@ export default function PrayerTimesTab() {
     if (!navigator.geolocation) {
       setLocationError(true);
       setIsLoadingLocation(false);
+      setShowLocationPrompt(false);
       toast.error("Геолокация не поддерживается вашим браузером");
       return;
     }
     setIsLoadingLocation(true);
     setLocationError(false);
+    setShowLocationPrompt(false);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const lat = pos.coords.latitude;
@@ -194,6 +253,9 @@ export default function PrayerTimesTab() {
         const name = await reverseGeocode(lat, lng);
         setLocationName(name);
         setIsLoadingLocation(false);
+        setShowLocationPrompt(false);
+        localStorageApplied.current = true;
+        saveStoredLocation(lat, lng, name);
       },
       (err) => {
         setLocationError(true);
@@ -214,20 +276,6 @@ export default function PrayerTimesTab() {
     );
   }, [reverseGeocode]);
 
-  const hasTriedAutoLocation = useRef(false);
-
-  // Auto-request location only if no saved location
-  useEffect(() => {
-    // Wait for savedSettings to load (it may be undefined initially)
-    if (savedSettings === undefined) return;
-    // If saved coords exist, don't auto-request
-    if (savedSettings?.latitude && savedSettings?.longitude) return;
-    if (!hasTriedAutoLocation.current) {
-      hasTriedAutoLocation.current = true;
-      requestLocation();
-    }
-  }, [savedSettings, requestLocation]);
-
   const handleCitySearch = useCallback(async () => {
     const query = citySearch.trim();
     if (!query) return;
@@ -244,14 +292,17 @@ export default function PrayerTimesTab() {
       }
       const result = data[0];
       const parts = (result.display_name as string).split(",").slice(0, 2);
-      setCoords({
-        lat: Number.parseFloat(result.lat),
-        lng: Number.parseFloat(result.lon),
-      });
-      setLocationName(parts.join(",").trim());
+      const lat = Number.parseFloat(result.lat);
+      const lng = Number.parseFloat(result.lon);
+      const name = parts.join(",").trim();
+      setCoords({ lat, lng });
+      setLocationName(name);
       setLocationError(false);
       setIsLoadingLocation(false);
+      setShowLocationPrompt(false);
+      localStorageApplied.current = true;
       setCitySearch("");
+      saveStoredLocation(lat, lng, name);
     } catch {
       toast.error("Ошибка поиска. Проверьте интернет-соединение");
     } finally {
@@ -578,6 +629,39 @@ export default function PrayerTimesTab() {
               <div className="text-foreground/40 text-xs mt-1">
                 до следующего намаза
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Location Permission Prompt */}
+      {showLocationPrompt && !isLoadingLocation && !coords && (
+        <div className="px-4 mb-4">
+          <div className="glass-card rounded-2xl p-6 text-center space-y-4 border border-orange-500/20">
+            <div className="flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
+                <MapPin size={26} className="text-orange-400" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-foreground font-semibold text-base">
+                Определить местоположение
+              </div>
+              <div className="text-foreground/50 text-xs leading-relaxed">
+                Разрешите доступ к геолокации, чтобы рассчитать точное время
+                намаза для вашего города
+              </div>
+            </div>
+            <Button
+              className="w-full bg-primary text-primary-foreground hover:bg-orange-400 gap-2 h-10"
+              onClick={requestLocation}
+              data-ocid="prayer.geolocation.primary_button"
+            >
+              <Locate size={15} />
+              Разрешить геолокацию
+            </Button>
+            <div className="text-foreground/30 text-[11px]">
+              Или введите город вручную ниже
             </div>
           </div>
         </div>

@@ -2,15 +2,141 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { BookOpen, Clock, Compass, User } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PrayerTimesTab from "./components/PrayerTimes";
 import ProfileTab, { AvatarCircle } from "./components/ProfileTab";
 import QiblaCompass from "./components/QiblaCompass";
 import QuranTab from "./components/QuranTab";
 import RamadanTab from "./components/RamadanTab";
 import TasbihTab from "./components/Tasbih";
+import { useFirebaseAuth } from "./hooks/useFirebaseAuth";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
-import { useSupabaseAuth } from "./hooks/useSupabaseAuth";
+
+// Splash screen component
+function SplashScreen({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 2800);
+    return () => clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background overflow-hidden"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.05 }}
+      transition={{ duration: 0.6, ease: "easeInOut" }}
+    >
+      {/* Radial glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 50% 50%, oklch(0.55 0.18 45 / 0.18) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* Geometric ring */}
+      <motion.div
+        className="absolute w-72 h-72 rounded-full border border-orange-500/15"
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1.4, opacity: [0, 0.4, 0] }}
+        transition={{ duration: 2.4, ease: "easeOut", delay: 0.3 }}
+      />
+      <motion.div
+        className="absolute w-56 h-56 rounded-full border border-orange-500/20"
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1.2, opacity: [0, 0.5, 0] }}
+        transition={{ duration: 2.2, ease: "easeOut", delay: 0.5 }}
+      />
+
+      {/* Logo */}
+      <motion.div
+        className="relative flex flex-col items-center gap-6"
+        initial={{ opacity: 0, scale: 0.75, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1], delay: 0.15 }}
+      >
+        {/* Mosque icon with glow */}
+        <div className="relative">
+          <div
+            className="absolute inset-0 rounded-3xl blur-2xl"
+            style={{
+              background: "oklch(0.55 0.18 45 / 0.45)",
+              transform: "scale(1.4)",
+            }}
+          />
+          <div className="relative w-24 h-24 rounded-3xl overflow-hidden border-2 border-orange-500/30 shadow-2xl shadow-orange-500/20">
+            <img
+              src="/assets/generated/mosque-logo-transparent.dim_200x200.png"
+              alt="Пятница!"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+
+        {/* App name */}
+        <div className="text-center space-y-1">
+          <motion.div
+            className="text-4xl font-display font-bold text-gradient-orange tracking-wide"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45, duration: 0.5 }}
+          >
+            Пятница!
+          </motion.div>
+          <motion.div
+            className="text-sm text-foreground/40 font-medium tracking-widest uppercase"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+          >
+            Помощник мусульманина
+          </motion.div>
+        </div>
+
+        {/* Arabic phrase */}
+        <motion.div
+          className="text-center space-y-1"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9, duration: 0.6 }}
+        >
+          <div
+            className="text-2xl text-orange-400/80 drop-shadow-lg leading-relaxed"
+            style={{ fontFamily: "serif", direction: "rtl" }}
+          >
+            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+          </div>
+          <div className="text-xs text-muted-foreground/50">
+            Во имя Аллаха, Милостивого, Милосердного
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Bottom pulse dots */}
+      <motion.div
+        className="absolute bottom-16 flex gap-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2, duration: 0.4 }}
+      >
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-orange-500/50"
+            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+            transition={{
+              duration: 1.0,
+              repeat: Number.POSITIVE_INFINITY,
+              delay: i * 0.2,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
+      </motion.div>
+    </motion.div>
+  );
+}
 
 type TabId = "prayer" | "qibla" | "tasbih" | "quran" | "ramadan" | "profile";
 
@@ -94,12 +220,6 @@ const TABS: NavTab[] = [
     icon: <BookOpen size={20} />,
     ocid: "nav.quran.tab",
   },
-  {
-    id: "profile",
-    label: "Профиль",
-    icon: <User size={20} />,
-    ocid: "nav.profile.tab",
-  },
 ];
 
 const pageVariants = {
@@ -108,20 +228,69 @@ const pageVariants = {
   exit: { opacity: 0, y: -6 },
 };
 
+function updateUsageStreak() {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const lastDate = localStorage.getItem("last_usage_date");
+    const streak = Number(localStorage.getItem("usage_streak") || "0");
+
+    if (lastDate === today) return; // already counted today
+
+    if (lastDate) {
+      const last = new Date(lastDate);
+      const now = new Date(today);
+      const diffDays = Math.round(
+        (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (diffDays === 1) {
+        // consecutive day
+        localStorage.setItem("usage_streak", String(streak + 1));
+      } else if (diffDays > 1) {
+        // streak broken
+        localStorage.setItem("usage_streak", "1");
+      }
+    } else {
+      // first ever usage
+      localStorage.setItem("usage_streak", "1");
+    }
+    localStorage.setItem("last_usage_date", today);
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("prayer");
+  const [showSplash, setShowSplash] = useState(true);
   const { isInitializing, identity } = useInternetIdentity();
-  const { user: supabaseUser, profile } = useSupabaseAuth();
+  const { user: firebaseUser, profile } = useFirebaseAuth();
+  const wasLoggedIn = useRef(false);
 
-  const isLoggedIn = !!identity || !!supabaseUser;
+  const isLoggedIn = !!identity || !!firebaseUser;
+
+  // Track daily usage streak on mount
+  useEffect(() => {
+    updateUsageStreak();
+  }, []);
+
+  // After email link sign-in: when user becomes authenticated, switch to profile tab
+  useEffect(() => {
+    if (isLoggedIn && !wasLoggedIn.current) {
+      setActiveTab("profile");
+      wasLoggedIn.current = true;
+    }
+    if (!isLoggedIn) {
+      wasLoggedIn.current = false;
+    }
+  }, [isLoggedIn]);
 
   // Derive display name for avatar
   const displayName =
     profile?.name ||
-    (supabaseUser?.email ? supabaseUser.email.split("@")[0] : null) ||
+    (firebaseUser?.email ? firebaseUser.email.split("@")[0] : null) ||
     (identity ? "II" : null) ||
     "";
-  const displayEmail = supabaseUser?.email || "";
+  const displayEmail = firebaseUser?.email || "";
 
   const renderTab = () => {
     switch (activeTab) {
@@ -144,6 +313,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background islamic-pattern flex flex-col max-w-md mx-auto relative">
+      {/* Splash screen */}
+      <AnimatePresence>
+        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      </AnimatePresence>
       {/* Header */}
       <header
         className="sticky top-0 z-20 px-4 py-3 flex items-center justify-between"
@@ -165,7 +338,7 @@ export default function App() {
           </div>
           <div>
             <div className="text-sm font-display font-bold text-gradient-orange leading-none">
-              Салях
+              Пятница!
             </div>
             <div className="text-[10px] text-foreground/30 leading-none mt-0.5">
               Помощник мусульманина
@@ -232,14 +405,13 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id)}
                   data-ocid={tab.ocid}
                 >
-                  {/* Center elevated button */}
+                  {/* Center highlighted button — contained within nav height */}
                   <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 mb-0.5 ${
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 ${
                       isActive
                         ? "bg-orange-500 text-white scale-105 shadow-orange-500/40"
                         : "bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25"
                     }`}
-                    style={{ marginTop: "-14px" }}
                   >
                     {tab.icon}
                   </div>

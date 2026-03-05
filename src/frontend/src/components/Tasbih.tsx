@@ -306,6 +306,10 @@ export default function TasbihTab() {
           return c;
         }),
       );
+      // Track total tasbih count for achievements
+      const prev = Number(localStorage.getItem("tasbih_total_count") || "0");
+      localStorage.setItem("tasbih_total_count", String(prev + 1));
+
       if (isLoggedIn) {
         incrementCounter(name);
       }

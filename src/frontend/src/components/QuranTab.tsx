@@ -1,14 +1,450 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { BookOpen, Search, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
+
+// Ayah data for surahs with full text
+interface Ayah {
+  number: number;
+  arabic: string;
+  translation: string;
+}
+
+const surahTexts: Record<number, Ayah[]> = {
+  1: [
+    {
+      number: 1,
+      arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+      translation: "Во имя Аллаха, Милостивого, Милосердного!",
+    },
+    {
+      number: 2,
+      arabic: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
+      translation: "Хвала Аллаху, Господу миров,",
+    },
+    {
+      number: 3,
+      arabic: "الرَّحْمَٰنِ الرَّحِيمِ",
+      translation: "Милостивому, Милосердному,",
+    },
+    {
+      number: 4,
+      arabic: "مَالِكِ يَوْمِ الدِّينِ",
+      translation: "Владыке Дня воздаяния!",
+    },
+    {
+      number: 5,
+      arabic: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
+      translation: "Тебе одному мы поклоняемся и Тебя одного молим о помощи.",
+    },
+    {
+      number: 6,
+      arabic: "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
+      translation: "Веди нас прямым путём,",
+    },
+    {
+      number: 7,
+      arabic: "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
+      translation:
+        "путём тех, кого Ты облагодетельствовал, не тех, на кого Ты разгневался, и не заблудших.",
+    },
+  ],
+  112: [
+    {
+      number: 1,
+      arabic: "قُلْ هُوَ اللَّهُ أَحَدٌ",
+      translation: "Скажи: «Он — Аллах Единый,",
+    },
+    { number: 2, arabic: "اللَّهُ الصَّمَدُ", translation: "Аллах Вечный." },
+    {
+      number: 3,
+      arabic: "لَمْ يَلِدْ وَلَمْ يُولَدْ",
+      translation: "Он не родил и не был рождён,",
+    },
+    {
+      number: 4,
+      arabic: "وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
+      translation: "и нет никого равного Ему».",
+    },
+  ],
+  113: [
+    {
+      number: 1,
+      arabic: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
+      translation: "Скажи: «Прибегаю к защите Господа рассвета",
+    },
+    {
+      number: 2,
+      arabic: "مِن شَرِّ مَا خَلَقَ",
+      translation: "от зла того, что Он сотворил,",
+    },
+    {
+      number: 3,
+      arabic: "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
+      translation: "от зла мрака, когда он наступает,",
+    },
+    {
+      number: 4,
+      arabic: "وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ",
+      translation: "от зла колдуний, дующих на узлы,",
+    },
+    {
+      number: 5,
+      arabic: "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
+      translation: "от зла завистника, когда он завидует».",
+    },
+  ],
+  114: [
+    {
+      number: 1,
+      arabic: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
+      translation: "Скажи: «Прибегаю к защите Господа людей,",
+    },
+    { number: 2, arabic: "مَلِكِ النَّاسِ", translation: "Царя людей," },
+    { number: 3, arabic: "إِلَٰهِ النَّاسِ", translation: "Бога людей," },
+    {
+      number: 4,
+      arabic: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ",
+      translation: "от зла искусителя исчезающего,",
+    },
+    {
+      number: 5,
+      arabic: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ",
+      translation: "который нашёптывает в груди людей,",
+    },
+    {
+      number: 6,
+      arabic: "مِنَ الْجِنَّةِ وَالنَّاسِ",
+      translation: "будь то джинны или люди».",
+    },
+  ],
+};
+
+// Decorative SVG ornament for surah header
+function SurahOrnament({ name }: { name: string }) {
+  return (
+    <div
+      className="relative flex items-center justify-center w-full mb-1"
+      style={{ background: "transparent" }}
+    >
+      {/* Ornamental border box */}
+      <div
+        className="relative w-full flex items-center justify-center py-3 px-4 rounded-lg overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 40%, #a5d6a7 100%)",
+          border: "2px solid #66bb6a",
+          boxShadow: "0 2px 8px rgba(76,175,80,0.15)",
+        }}
+      >
+        {/* Left flower decoration */}
+        <svg
+          role="img"
+          aria-label="Декоративный орнамент"
+          className="absolute left-2 top-1/2 -translate-y-1/2"
+          width="36"
+          height="36"
+          viewBox="0 0 36 36"
+          fill="none"
+        >
+          <circle cx="18" cy="18" r="5" fill="#4caf50" opacity="0.4" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+            <ellipse
+              key={deg}
+              cx={18 + 10 * Math.cos((deg * Math.PI) / 180)}
+              cy={18 + 10 * Math.sin((deg * Math.PI) / 180)}
+              rx="4"
+              ry="2.5"
+              transform={`rotate(${deg} ${18 + 10 * Math.cos((deg * Math.PI) / 180)} ${18 + 10 * Math.sin((deg * Math.PI) / 180)})`}
+              fill="#66bb6a"
+              opacity="0.5"
+            />
+          ))}
+        </svg>
+        {/* Right flower decoration */}
+        <svg
+          role="img"
+          aria-label="Декоративный орнамент"
+          className="absolute right-2 top-1/2 -translate-y-1/2"
+          width="36"
+          height="36"
+          viewBox="0 0 36 36"
+          fill="none"
+        >
+          <circle cx="18" cy="18" r="5" fill="#4caf50" opacity="0.4" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+            <ellipse
+              key={deg}
+              cx={18 + 10 * Math.cos((deg * Math.PI) / 180)}
+              cy={18 + 10 * Math.sin((deg * Math.PI) / 180)}
+              rx="4"
+              ry="2.5"
+              transform={`rotate(${deg} ${18 + 10 * Math.cos((deg * Math.PI) / 180)} ${18 + 10 * Math.sin((deg * Math.PI) / 180)})`}
+              fill="#66bb6a"
+              opacity="0.5"
+            />
+          ))}
+        </svg>
+        {/* Horizontal lines */}
+        <div className="absolute left-12 right-12 top-1 h-px bg-green-600/30" />
+        <div className="absolute left-12 right-12 bottom-1 h-px bg-green-600/30" />
+        {/* Arabic name */}
+        <span
+          className="text-2xl font-bold"
+          style={{
+            fontFamily: "serif",
+            direction: "rtl",
+            color: "#1a3c1a",
+            textShadow: "0 1px 2px rgba(0,0,0,0.08)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {name}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Ayah number medallion (like in Muslim Pro)
+function AyahMedallion({ number }: { number: number }) {
+  return (
+    <div className="flex-shrink-0 w-8 h-8 relative flex items-center justify-center">
+      <svg
+        role="img"
+        aria-label="Номер аята"
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+      >
+        <polygon
+          points="16,1 20,11 31,11 22,18 25,29 16,22 7,29 10,18 1,11 12,11"
+          fill="none"
+          stroke="#4caf50"
+          strokeWidth="1.5"
+          opacity="0.6"
+        />
+        <circle
+          cx="16"
+          cy="16"
+          r="8"
+          fill="none"
+          stroke="#4caf50"
+          strokeWidth="0.8"
+          opacity="0.4"
+        />
+      </svg>
+      <span
+        className="absolute text-[9px] font-bold"
+        style={{ color: "#2e7d32" }}
+      >
+        {number}
+      </span>
+    </div>
+  );
+}
+
+// Full reading view for a surah
+function SurahReadingView({
+  surah,
+  onBack,
+}: { surah: Surah; onBack: () => void }) {
+  const ayahs = surahTexts[surah.number];
+  const hasFullText = !!ayahs;
+
+  return (
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "#faf8f0" }}
+      data-ocid="quran.reading.panel"
+    >
+      {/* Top bar */}
+      <div
+        className="sticky top-0 z-10 flex items-center justify-between px-4 py-3"
+        style={{
+          background: "#faf8f0",
+          borderBottom: "1px solid rgba(76,175,80,0.2)",
+        }}
+      >
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium"
+          style={{ color: "#2e7d32" }}
+          onClick={onBack}
+          data-ocid="quran.reading.back_button"
+        >
+          <ArrowLeft size={18} />
+          <span>Назад</span>
+        </button>
+        <div className="text-center">
+          <div className="text-xs font-semibold" style={{ color: "#2e7d32" }}>
+            {surah.number}. {surah.nameRu}
+          </div>
+        </div>
+        <div className="w-16" />
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 px-4 py-5 pb-24">
+        {/* Surah header ornament */}
+        <SurahOrnament name={surah.arabic} />
+
+        {/* Basmala */}
+        {surah.number !== 1 && surah.number !== 9 && (
+          <div
+            className="text-center text-2xl my-6 leading-loose"
+            style={{ fontFamily: "serif", direction: "rtl", color: "#1a1a1a" }}
+          >
+            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+          </div>
+        )}
+
+        {/* Info row */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <span
+            className="text-xs px-3 py-1 rounded-full font-medium"
+            style={{
+              background: "rgba(76,175,80,0.12)",
+              color: "#2e7d32",
+              border: "1px solid rgba(76,175,80,0.25)",
+            }}
+          >
+            {surah.place}
+          </span>
+          <span
+            className="text-xs px-3 py-1 rounded-full font-medium"
+            style={{
+              background: "rgba(76,175,80,0.12)",
+              color: "#2e7d32",
+              border: "1px solid rgba(76,175,80,0.25)",
+            }}
+          >
+            {surah.verses} аятов
+          </span>
+        </div>
+
+        {/* Ayahs */}
+        {hasFullText ? (
+          <div className="space-y-0">
+            {ayahs.map((ayah, idx) => (
+              <div
+                key={ayah.number}
+                className="py-4"
+                style={{
+                  borderBottom:
+                    idx < ayahs.length - 1
+                      ? "1px solid rgba(76,175,80,0.12)"
+                      : "none",
+                }}
+                data-ocid={`quran.ayah.item.${ayah.number}`}
+              >
+                {/* Arabic text with ayah number medallion at end */}
+                <div
+                  className="flex items-start gap-2 justify-end mb-2"
+                  style={{ direction: "rtl" }}
+                >
+                  <p
+                    className="text-right leading-loose flex-1"
+                    style={{
+                      fontFamily: "serif",
+                      fontSize: "1.5rem",
+                      color: "#1a1a1a",
+                      lineHeight: "2.2",
+                    }}
+                  >
+                    {ayah.arabic}
+                  </p>
+                  <div className="mt-2 flex-shrink-0">
+                    <AyahMedallion number={ayah.number} />
+                  </div>
+                </div>
+                {/* Translation */}
+                <p
+                  className="text-sm leading-relaxed mt-1"
+                  style={{ color: "#5a5a5a", lineHeight: "1.7" }}
+                >
+                  <span
+                    style={{
+                      color: "#4caf50",
+                      fontWeight: 600,
+                      marginRight: "4px",
+                    }}
+                  >
+                    {ayah.number}.
+                  </span>
+                  {ayah.translation}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* No full text available - show description + prompt */
+          <div className="space-y-4">
+            <div
+              className="rounded-2xl p-5"
+              style={{
+                background: "rgba(76,175,80,0.07)",
+                border: "1px solid rgba(76,175,80,0.2)",
+              }}
+            >
+              <div
+                className="text-xs font-semibold uppercase tracking-widest mb-3"
+                style={{ color: "#4caf50" }}
+              >
+                О суре
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: "#333" }}>
+                {surah.descriptionRu}
+              </p>
+            </div>
+
+            {/* Arabic name large */}
+            <div
+              className="text-center py-8"
+              style={{
+                fontFamily: "serif",
+                direction: "rtl",
+                fontSize: "3rem",
+                color: "#1a3c1a",
+              }}
+            >
+              {surah.arabic}
+            </div>
+
+            <div
+              className="text-center text-sm rounded-2xl py-4 px-5"
+              style={{
+                background: "rgba(76,175,80,0.07)",
+                border: "1px dashed rgba(76,175,80,0.3)",
+                color: "#666",
+              }}
+            >
+              Полный текст этой суры содержит {surah.verses} аятов.
+              <br />
+              <span style={{ color: "#4caf50" }}>
+                Скоро будет добавлен полный текст.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function trackSurahRead(surahNumber: number) {
+  try {
+    const raw = localStorage.getItem("quran_read_surahs");
+    const readIds: number[] = raw ? JSON.parse(raw) : [];
+    if (!readIds.includes(surahNumber)) {
+      readIds.push(surahNumber);
+      localStorage.setItem("quran_read_surahs", JSON.stringify(readIds));
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function QuranTab() {
   const [search, setSearch] = useState("");
@@ -25,6 +461,21 @@ export default function QuranTab() {
         String(s.number).includes(q),
     );
   }, [search]);
+
+  const handleSelectSurah = (surah: Surah) => {
+    trackSurahRead(surah.number);
+    setSelectedSurah(surah);
+  };
+
+  // Full reading view
+  if (selectedSurah) {
+    return (
+      <SurahReadingView
+        surah={selectedSurah}
+        onBack={() => setSelectedSurah(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col px-4 py-4">
@@ -84,7 +535,7 @@ export default function QuranTab() {
               type="button"
               key={surah.number}
               className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3 hover:border-orange-500/30 transition-all duration-200 text-left group"
-              onClick={() => setSelectedSurah(surah)}
+              onClick={() => handleSelectSurah(surah)}
               data-ocid={`quran.surah.item.${surah.number}`}
             >
               {/* Number badge */}
@@ -123,294 +574,6 @@ export default function QuranTab() {
           ))}
         </div>
       )}
-
-      {/* Surah Detail Sheet */}
-      <Sheet
-        open={!!selectedSurah}
-        onOpenChange={(open) => !open && setSelectedSurah(null)}
-      >
-        <SheetContent
-          side="bottom"
-          className="bg-card border-orange-500/20 rounded-t-2xl max-h-[85vh] overflow-y-auto"
-          data-ocid="quran.surah.sheet"
-        >
-          {selectedSurah && (
-            <>
-              <SheetHeader className="pb-4 relative">
-                <button
-                  type="button"
-                  className="absolute right-0 top-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-foreground/40 hover:text-foreground transition-colors"
-                  onClick={() => setSelectedSurah(null)}
-                  data-ocid="quran.surah.close_button"
-                >
-                  <X size={14} />
-                </button>
-                <SheetTitle className="text-foreground font-display text-left pr-10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
-                      <span className="text-sm font-bold text-orange-400">
-                        {selectedSurah.number}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-foreground">
-                        {selectedSurah.nameRu}
-                      </div>
-                      <div className="text-xs text-foreground/40 font-normal">
-                        {selectedSurah.transliteration}
-                      </div>
-                    </div>
-                  </div>
-                </SheetTitle>
-              </SheetHeader>
-
-              {/* Arabic name large */}
-              <div className="text-center mb-5">
-                <div
-                  className="text-4xl font-bold text-gradient-orange leading-relaxed"
-                  style={{ fontFamily: "serif", direction: "rtl" }}
-                >
-                  {selectedSurah.arabic}
-                </div>
-              </div>
-
-              {/* Basmala */}
-              {selectedSurah.number !== 1 && selectedSurah.number !== 9 && (
-                <div
-                  className="text-center text-lg text-foreground/60 mb-5 pb-4 border-b border-orange-500/10"
-                  style={{ fontFamily: "serif", direction: "rtl" }}
-                >
-                  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-                </div>
-              )}
-
-              {/* Info grid */}
-              <div className="grid grid-cols-3 gap-3 mb-5">
-                <div className="glass-card rounded-xl p-3 text-center">
-                  <div className="text-orange-400 text-lg font-bold">
-                    {selectedSurah.number}
-                  </div>
-                  <div className="text-foreground/40 text-[10px] mt-0.5">
-                    Номер суры
-                  </div>
-                </div>
-                <div className="glass-card rounded-xl p-3 text-center">
-                  <div className="text-orange-400 text-lg font-bold">
-                    {selectedSurah.verses}
-                  </div>
-                  <div className="text-foreground/40 text-[10px] mt-0.5">
-                    Аятов
-                  </div>
-                </div>
-                <div className="glass-card rounded-xl p-3 text-center">
-                  <div className="text-orange-400 text-sm font-bold">
-                    {selectedSurah.place}
-                  </div>
-                  <div className="text-foreground/40 text-[10px] mt-0.5">
-                    Место
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="glass-card rounded-xl p-4 mb-4">
-                <div className="text-xs text-orange-400 uppercase tracking-widest mb-2 font-medium">
-                  О суре
-                </div>
-                <p className="text-foreground/70 text-sm leading-relaxed">
-                  {selectedSurah.descriptionRu}
-                </p>
-              </div>
-
-              {/* Surah 1 full text */}
-              {selectedSurah.number === 1 && (
-                <div className="glass-card rounded-xl p-4 mb-4">
-                  <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
-                    Текст суры
-                  </div>
-                  <div
-                    className="text-right text-foreground/90 leading-[2.2] text-lg"
-                    style={{ fontFamily: "serif", direction: "rtl" }}
-                  >
-                    <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ﴿١﴾</p>
-                    <p>الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ﴿٢﴾</p>
-                    <p>الرَّحْمَٰنِ الرَّحِيمِ ﴿٣﴾</p>
-                    <p>مَالِكِ يَوْمِ الدِّينِ ﴿٤﴾</p>
-                    <p>إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ﴿٥﴾</p>
-                    <p>اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ ﴿٦﴾</p>
-                    <p>
-                      صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ ﴿٧﴾
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-orange-500/10 space-y-2 text-foreground/60 text-sm">
-                    <p>
-                      <span className="text-orange-400/70">1.</span> Во имя
-                      Аллаха, Милостивого, Милосердного!
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">2.</span> Хвала
-                      Аллаху, Господу миров,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">3.</span>{" "}
-                      Милостивому, Милосердному,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">4.</span> Владыке Дня
-                      воздаяния!
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">5.</span> Тебе одному
-                      мы поклоняемся и Тебя одного молим о помощи.
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">6.</span> Веди нас
-                      прямым путём,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">7.</span> путём тех,
-                      кого Ты облагодетельствовал, не тех, на кого Ты
-                      разгневался, и не заблудших.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Short surahs full text */}
-              {selectedSurah.number === 112 && (
-                <div className="glass-card rounded-xl p-4 mb-4">
-                  <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
-                    Текст суры
-                  </div>
-                  <div
-                    className="text-right text-foreground/90 leading-[2.2] text-lg"
-                    style={{ fontFamily: "serif", direction: "rtl" }}
-                  >
-                    <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
-                    <p>قُلْ هُوَ اللَّهُ أَحَدٌ ﴿١﴾</p>
-                    <p>اللَّهُ الصَّمَدُ ﴿٢﴾</p>
-                    <p>لَمْ يَلِدْ وَلَمْ يُولَدْ ﴿٣﴾</p>
-                    <p>وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ ﴿٤﴾</p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-orange-500/10 space-y-2 text-foreground/60 text-sm">
-                    <p>
-                      <span className="text-orange-400/70">1.</span> Скажи: «Он
-                      — Аллах Единый,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">2.</span> Аллах
-                      Вечный.
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">3.</span> Он не родил
-                      и не был рождён,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">4.</span> и нет
-                      никого равного Ему».
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {selectedSurah.number === 113 && (
-                <div className="glass-card rounded-xl p-4 mb-4">
-                  <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
-                    Текст суры
-                  </div>
-                  <div
-                    className="text-right text-foreground/90 leading-[2.2] text-lg"
-                    style={{ fontFamily: "serif", direction: "rtl" }}
-                  >
-                    <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
-                    <p>قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ﴿١﴾</p>
-                    <p>مِن شَرِّ مَا خَلَقَ ﴿٢﴾</p>
-                    <p>وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ﴿٣﴾</p>
-                    <p>وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ﴿٤﴾</p>
-                    <p>وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ﴿٥﴾</p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-orange-500/10 space-y-2 text-foreground/60 text-sm">
-                    <p>
-                      <span className="text-orange-400/70">1.</span> Скажи:
-                      «Прибегаю к защите Господа рассвета
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">2.</span> от зла
-                      того, что Он сотворил,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">3.</span> от зла
-                      мрака, когда он наступает,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">4.</span> от зла
-                      колдуний, дующих на узлы,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">5.</span> от зла
-                      завистника, когда он завидует».
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {selectedSurah.number === 114 && (
-                <div className="glass-card rounded-xl p-4 mb-4">
-                  <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
-                    Текст суры
-                  </div>
-                  <div
-                    className="text-right text-foreground/90 leading-[2.2] text-lg"
-                    style={{ fontFamily: "serif", direction: "rtl" }}
-                  >
-                    <p>بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
-                    <p>قُلْ أَعُوذُ بِرَبِّ النَّاسِ ﴿١﴾</p>
-                    <p>مَلِكِ النَّاسِ ﴿٢﴾</p>
-                    <p>إِلَٰهِ النَّاسِ ﴿٣﴾</p>
-                    <p>مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ﴿٤﴾</p>
-                    <p>الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ﴿٥﴾</p>
-                    <p>مِنَ الْجِنَّةِ وَالنَّاسِ ﴿٦﴾</p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-orange-500/10 space-y-2 text-foreground/60 text-sm">
-                    <p>
-                      <span className="text-orange-400/70">1.</span> Скажи:
-                      «Прибегаю к защите Господа людей,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">2.</span> Царя людей,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">3.</span> Бога людей,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">4.</span> от зла
-                      искусителя исчезающего,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">5.</span> который
-                      нашёптывает в груди людей,
-                    </p>
-                    <p>
-                      <span className="text-orange-400/70">6.</span> будь то
-                      джинны или люди».
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Hint for longer surahs */}
-              {selectedSurah.number > 1 &&
-                selectedSurah.number !== 112 &&
-                selectedSurah.number !== 113 &&
-                selectedSurah.number !== 114 && (
-                  <div className="text-center text-foreground/20 text-xs pb-2">
-                    Для чтения полного текста откройте Коран
-                  </div>
-                )}
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
