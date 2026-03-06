@@ -3,14 +3,16 @@ import { Toaster } from "@/components/ui/sonner";
 import { BookOpen, Clock, Compass, User } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import BooksTab from "./components/BooksTab";
 import PrayerTimesTab from "./components/PrayerTimes";
 import ProfileTab, { AvatarCircle } from "./components/ProfileTab";
 import QiblaCompass from "./components/QiblaCompass";
-import QuranTab from "./components/QuranTab";
 import RamadanTab from "./components/RamadanTab";
 import TasbihTab from "./components/Tasbih";
 import { useFirebaseAuth } from "./hooks/useFirebaseAuth";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { tr, useLanguage } from "./hooks/useLanguage";
+import { playNavTap } from "./utils/sounds";
 
 // Splash screen component
 function SplashScreen({ onDone }: { onDone: () => void }) {
@@ -165,62 +167,64 @@ function CrescentIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-const TABS: NavTab[] = [
-  {
-    id: "prayer",
-    label: "Намаз",
-    icon: <Clock size={20} />,
-    ocid: "nav.prayer_times.tab",
-  },
-  {
-    id: "qibla",
-    label: "Кибла",
-    icon: <Compass size={20} />,
-    ocid: "nav.qibla.tab",
-  },
-  {
-    id: "ramadan",
-    label: "Рамадан",
-    icon: <CrescentIcon size={22} />,
-    ocid: "nav.ramadan.tab",
-    isCenter: true,
-  },
-  {
-    id: "tasbih",
-    label: "Тасбих",
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-label="Тасбих"
-        role="img"
-      >
-        <title>Тасбих</title>
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 3c0 0 1.5 2 1.5 4.5S12 12 12 12" />
-        <path d="M12 3c0 0-1.5 2-1.5 4.5S12 12 12 12" />
-        <path d="M3 12c0 0 2-1.5 4.5-1.5S12 12 12 12" />
-        <path d="M3 12c0 0 2 1.5 4.5 1.5S12 12 12 12" />
-        <path d="M21 12c0 0-2 1.5-4.5 1.5S12 12 12 12" />
-        <path d="M21 12c0 0-2-1.5-4.5-1.5S12 12 12 12" />
-        <circle cx="12" cy="3" r="1.5" />
-      </svg>
-    ),
-    ocid: "nav.tasbih.tab",
-  },
-  {
-    id: "quran",
-    label: "Коран",
-    icon: <BookOpen size={20} />,
-    ocid: "nav.quran.tab",
-  },
-];
+function buildTabs(lang: import("./hooks/useLanguage").LangCode): NavTab[] {
+  return [
+    {
+      id: "prayer",
+      label: tr("nav.prayer", lang),
+      icon: <Clock size={20} />,
+      ocid: "nav.prayer_times.tab",
+    },
+    {
+      id: "qibla",
+      label: tr("nav.qibla", lang),
+      icon: <Compass size={20} />,
+      ocid: "nav.qibla.tab",
+    },
+    {
+      id: "ramadan",
+      label: tr("nav.ramadan", lang),
+      icon: <CrescentIcon size={22} />,
+      ocid: "nav.ramadan.tab",
+      isCenter: true,
+    },
+    {
+      id: "tasbih",
+      label: tr("nav.tasbih", lang),
+      icon: (
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-label={tr("nav.tasbih", lang)}
+          role="img"
+        >
+          <title>{tr("nav.tasbih", lang)}</title>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 3c0 0 1.5 2 1.5 4.5S12 12 12 12" />
+          <path d="M12 3c0 0-1.5 2-1.5 4.5S12 12 12 12" />
+          <path d="M3 12c0 0 2-1.5 4.5-1.5S12 12 12 12" />
+          <path d="M3 12c0 0 2 1.5 4.5 1.5S12 12 12 12" />
+          <path d="M21 12c0 0-2 1.5-4.5 1.5S12 12 12 12" />
+          <path d="M21 12c0 0-2-1.5-4.5-1.5S12 12 12 12" />
+          <circle cx="12" cy="3" r="1.5" />
+        </svg>
+      ),
+      ocid: "nav.tasbih.tab",
+    },
+    {
+      id: "quran",
+      label: tr("nav.books", lang),
+      icon: <BookOpen size={20} />,
+      ocid: "nav.quran.tab",
+    },
+  ];
+}
 
 const pageVariants = {
   initial: { opacity: 0, y: 6 },
@@ -264,7 +268,11 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const { isInitializing, identity } = useInternetIdentity();
   const { user: firebaseUser, profile } = useFirebaseAuth();
+  const lang = useLanguage();
+  const TABS = buildTabs(lang);
   const wasLoggedIn = useRef(false);
+  // splashDone: becomes true only after the splash screen finishes
+  const splashDone = useRef(false);
 
   const isLoggedIn = !!identity || !!firebaseUser;
 
@@ -273,15 +281,19 @@ export default function App() {
     updateUsageStreak();
   }, []);
 
-  // After email link sign-in: when user becomes authenticated, switch to profile tab
+  // After explicit sign-in during the session: switch to profile tab
+  // But only AFTER the splash has finished (not when auth state initializes on app start)
   useEffect(() => {
+    // If splash is still showing, just record current login state and do nothing
+    if (!splashDone.current) {
+      wasLoggedIn.current = isLoggedIn;
+      return;
+    }
+    // After splash: if user goes from logged-out to logged-in, navigate to profile
     if (isLoggedIn && !wasLoggedIn.current) {
       setActiveTab("profile");
-      wasLoggedIn.current = true;
     }
-    if (!isLoggedIn) {
-      wasLoggedIn.current = false;
-    }
+    wasLoggedIn.current = isLoggedIn;
   }, [isLoggedIn]);
 
   // Derive display name for avatar
@@ -301,7 +313,7 @@ export default function App() {
       case "tasbih":
         return <TasbihTab />;
       case "quran":
-        return <QuranTab />;
+        return <BooksTab />;
       case "ramadan":
         return <RamadanTab />;
       case "profile":
@@ -315,7 +327,16 @@ export default function App() {
     <div className="min-h-screen bg-background islamic-pattern flex flex-col max-w-md mx-auto relative">
       {/* Splash screen */}
       <AnimatePresence>
-        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+        {showSplash && (
+          <SplashScreen
+            onDone={() => {
+              splashDone.current = true;
+              wasLoggedIn.current = isLoggedIn;
+              setActiveTab("prayer");
+              setShowSplash(false);
+            }}
+          />
+        )}
       </AnimatePresence>
       {/* Header */}
       <header
@@ -402,7 +423,10 @@ export default function App() {
                   type="button"
                   key={tab.id}
                   className="flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-200 focus-visible:outline-none"
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    playNavTap();
+                    setActiveTab(tab.id);
+                  }}
                   data-ocid={tab.ocid}
                 >
                   {/* Center highlighted button — contained within nav height */}
@@ -431,7 +455,10 @@ export default function App() {
                 type="button"
                 key={tab.id}
                 className="flex-1 flex flex-col items-center justify-center gap-1 relative transition-all duration-200 focus-visible:outline-none"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  playNavTap();
+                  setActiveTab(tab.id);
+                }}
                 data-ocid={tab.ocid}
               >
                 {/* Active indicator */}

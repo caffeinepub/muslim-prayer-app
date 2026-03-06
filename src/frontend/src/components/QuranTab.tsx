@@ -1,9 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, BookOpen, CheckCircle2, Search } from "lucide-react";
+import { ArrowLeft, BookOpen, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
 
 // Ayah data for surahs with full text
@@ -254,21 +252,6 @@ function SurahReadingView({
 }: { surah: Surah; onBack: () => void }) {
   const ayahs = surahTexts[surah.number];
   const hasFullText = !!ayahs;
-  const [markedRead, setMarkedRead] = useState(() => {
-    try {
-      const raw = localStorage.getItem("quran_read_surahs");
-      const ids: number[] = raw ? JSON.parse(raw) : [];
-      return ids.includes(surah.number);
-    } catch {
-      return false;
-    }
-  });
-
-  const handleMarkRead = () => {
-    trackSurahRead(surah.number);
-    setMarkedRead(true);
-    toast.success(`Сура «${surah.nameRu}» засчитана в профиль! 📖`);
-  };
 
   return (
     <div
@@ -394,35 +377,6 @@ function SurahReadingView({
                 </p>
               </div>
             ))}
-            {/* Mark as read button */}
-            <div className="pt-6 pb-2 flex flex-col items-center gap-3">
-              {markedRead ? (
-                <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-green-500/10 border border-green-500/25">
-                  <CheckCircle2 size={18} className="text-green-500" />
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: "#2e7d32" }}
-                  >
-                    Засчитано в профиль
-                  </span>
-                </div>
-              ) : (
-                <Button
-                  className="px-8 h-11 rounded-2xl font-bold text-sm gap-2"
-                  style={{
-                    background: "linear-gradient(135deg, #4caf50, #2e7d32)",
-                    color: "#fff",
-                    border: "none",
-                    boxShadow: "0 4px 12px rgba(76,175,80,0.3)",
-                  }}
-                  onClick={handleMarkRead}
-                  data-ocid="quran.reading.mark_read.button"
-                >
-                  <CheckCircle2 size={16} />
-                  Прочитал
-                </Button>
-              )}
-            </div>
           </div>
         ) : (
           /* No full text available - show description + prompt */
@@ -472,54 +426,11 @@ function SurahReadingView({
                 Скоро будет добавлен полный текст.
               </span>
             </div>
-
-            {/* Mark as read button for surahs without full text */}
-            <div className="pt-4 pb-2 flex flex-col items-center gap-3">
-              {markedRead ? (
-                <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-green-500/10 border border-green-500/25">
-                  <CheckCircle2 size={18} className="text-green-500" />
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: "#2e7d32" }}
-                  >
-                    Засчитано в профиль
-                  </span>
-                </div>
-              ) : (
-                <Button
-                  className="px-8 h-11 rounded-2xl font-bold text-sm gap-2"
-                  style={{
-                    background: "linear-gradient(135deg, #4caf50, #2e7d32)",
-                    color: "#fff",
-                    border: "none",
-                    boxShadow: "0 4px 12px rgba(76,175,80,0.3)",
-                  }}
-                  onClick={handleMarkRead}
-                  data-ocid="quran.reading.mark_read.button"
-                >
-                  <CheckCircle2 size={16} />
-                  Прочитал
-                </Button>
-              )}
-            </div>
           </div>
         )}
       </div>
     </div>
   );
-}
-
-function trackSurahRead(surahNumber: number) {
-  try {
-    const raw = localStorage.getItem("quran_read_surahs");
-    const readIds: number[] = raw ? JSON.parse(raw) : [];
-    if (!readIds.includes(surahNumber)) {
-      readIds.push(surahNumber);
-      localStorage.setItem("quran_read_surahs", JSON.stringify(readIds));
-    }
-  } catch {
-    /* ignore */
-  }
 }
 
 export default function QuranTab() {
@@ -537,11 +448,6 @@ export default function QuranTab() {
         String(s.number).includes(q),
     );
   }, [search]);
-
-  const handleSelectSurah = (surah: Surah) => {
-    trackSurahRead(surah.number);
-    setSelectedSurah(surah);
-  };
 
   // Full reading view
   if (selectedSurah) {
@@ -611,7 +517,7 @@ export default function QuranTab() {
               type="button"
               key={surah.number}
               className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3 hover:border-orange-500/30 transition-all duration-200 text-left group"
-              onClick={() => handleSelectSurah(surah)}
+              onClick={() => setSelectedSurah(surah)}
               data-ocid={`quran.surah.item.${surah.number}`}
             >
               {/* Number badge */}

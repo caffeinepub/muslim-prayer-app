@@ -31,6 +31,7 @@ import {
   useIncrementTasbihCounter,
   useResetTasbihCounter,
 } from "../hooks/useQueries";
+import { playTasbihClick, playTasbihGoal } from "../utils/sounds";
 
 interface LocalCounter {
   name: string;
@@ -295,11 +296,13 @@ export default function TasbihTab() {
 
   const handleIncrement = useCallback(
     (name: string) => {
+      let goalReached = false;
       setLocalCounters((prev) =>
         prev.map((c) => {
           if (c.name === name) {
             const newCount = c.count + 1;
             if (newCount === c.target) {
+              goalReached = true;
               toast.success(`${name} — цель достигнута! 🎉`, {
                 duration: 2000,
               });
@@ -309,6 +312,12 @@ export default function TasbihTab() {
           return c;
         }),
       );
+      // Play sound
+      if (goalReached) {
+        playTasbihGoal();
+      } else {
+        playTasbihClick();
+      }
       // Track total tasbih count for achievements
       const prev = Number(localStorage.getItem("tasbih_total_count") || "0");
       localStorage.setItem("tasbih_total_count", String(prev + 1));

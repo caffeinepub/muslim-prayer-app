@@ -34,15 +34,19 @@ import {
   Search,
   Settings,
 } from "lucide-react";
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PrayerSettings } from "../backend.d";
+import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { tr, useLanguage } from "../hooks/useLanguage";
 import {
   useGetPrayerSettings,
   useSavePrayerSettings,
 } from "../hooks/useQueries";
 import { formatGregorianRu, formatHijriRu, toHijri } from "../utils/hijriDate";
+import { playPrayerCheck } from "../utils/sounds";
 
 interface PrayerInfo {
   name: string;
@@ -176,6 +180,8 @@ function savePrayersDone(done: Set<string>) {
 }
 
 export default function PrayerTimesTab() {
+  const lang = useLanguage();
+
   // Initialize coords directly from localStorage so they never flash empty
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     () => {
@@ -206,13 +212,32 @@ export default function PrayerTimesTab() {
   const [prayersDone, setPrayersDone] = useState<Set<string>>(loadPrayersDone);
 
   const { identity } = useInternetIdentity();
-  const isLoggedIn = !!identity;
+  const { user: firebaseUser } = useFirebaseAuth();
+  const isAuthorLoggedIn = sessionStorage.getItem("author_session") === "1";
+  const isLoggedIn = !!identity || !!firebaseUser || isAuthorLoggedIn;
   const { data: savedSettings } = useGetPrayerSettings();
   const { mutate: saveSettings } = useSavePrayerSettings();
 
-  // Tick every second
+  // Tick every second; auto-reset prayers at midnight
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
+    let lastDateKey = getTodayKey();
+    const interval = setInterval(() => {
+      const currentDateKey = getTodayKey();
+      if (currentDateKey !== lastDateKey) {
+        // New day — reset all prayer completions
+        lastDateKey = currentDateKey;
+        setPrayersDone(new Set());
+        try {
+          localStorage.setItem(
+            PRAYER_TRACK_KEY,
+            JSON.stringify({ date: currentDateKey, keys: [] }),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      setNow(new Date());
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -388,42 +413,42 @@ export default function PrayerTimesTab() {
         {
           name: "Fajr",
           nameArabic: "الفجر",
-          nameRu: "Фаджр",
+          nameRu: tr("prayer.fajr", lang),
           time: prayerTimes.fajr,
           key: "fajr",
         },
         {
           name: "Sunrise",
           nameArabic: "الشروق",
-          nameRu: "Восход",
+          nameRu: tr("prayer.sunrise", lang),
           time: prayerTimes.sunrise,
           key: "sunrise",
         },
         {
           name: "Dhuhr",
           nameArabic: "الظهر",
-          nameRu: "Зухр",
+          nameRu: tr("prayer.dhuhr", lang),
           time: prayerTimes.dhuhr,
           key: "dhuhr",
         },
         {
           name: "Asr",
           nameArabic: "العصر",
-          nameRu: "Аср",
+          nameRu: tr("prayer.asr", lang),
           time: prayerTimes.asr,
           key: "asr",
         },
         {
           name: "Maghrib",
           nameArabic: "المغرب",
-          nameRu: "Магриб",
+          nameRu: tr("prayer.maghrib", lang),
           time: prayerTimes.maghrib,
           key: "maghrib",
         },
         {
           name: "Isha",
           nameArabic: "العشاء",
-          nameRu: "Иша",
+          nameRu: tr("prayer.isha", lang),
           time: prayerTimes.isha,
           key: "isha",
         },
@@ -486,9 +511,9 @@ export default function PrayerTimesTab() {
       } else {
         next.add(key);
         savePrayersDone(next);
-        toast.success(
-          `${key === "fajr" ? "Фаджр" : key === "dhuhr" ? "Зухр" : key === "asr" ? "Аср" : key === "maghrib" ? "Магриб" : "Иша"} совершён! 🤲`,
-        );
+        playPrayerCheck();
+        const prayerName = tr(`prayer.${key}`, lang);
+        toast.success(`${prayerName} совершён! 🤲`);
       }
       return next;
     });
@@ -496,13 +521,426 @@ export default function PrayerTimesTab() {
 
   const todayHijri = toHijri(now);
 
-  const prayerIcons: Record<string, string> = {
-    fajr: "🌙",
-    sunrise: "🌅",
-    dhuhr: "☀️",
-    asr: "🌤️",
-    maghrib: "🌆",
-    isha: "🌠",
+  // PrayerIcon component defined inline to keep file self-contained
+  const PrayerIcon = ({ type }: { type: string }) => {
+    const icons: Record<string, React.ReactNode> = {
+      fajr: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Фаджр"
+          role="img"
+        >
+          <title>Фаджр</title>
+          <defs>
+            <radialGradient id="fajr-bg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#1e1060" />
+              <stop offset="100%" stopColor="#0a0520" />
+            </radialGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#fajr-bg)" />
+          {/* Stars */}
+          <circle cx="7" cy="7" r="0.8" fill="#e2c97e" opacity="0.9" />
+          <circle cx="14" cy="5" r="0.6" fill="#e2c97e" opacity="0.7" />
+          <circle cx="25" cy="9" r="0.9" fill="#d4b8f0" opacity="0.8" />
+          <circle cx="28" cy="5" r="0.5" fill="#e2c97e" opacity="0.6" />
+          <circle cx="5" cy="13" r="0.5" fill="#d4b8f0" opacity="0.5" />
+          <circle cx="22" cy="4" r="0.7" fill="#e2c97e" opacity="0.7" />
+          {/* Crescent moon */}
+          <path
+            d="M20 16 A7 7 0 1 1 13 9 A5 5 0 1 0 20 16 Z"
+            fill="#f5d97a"
+            opacity="0.95"
+          />
+        </svg>
+      ),
+      sunrise: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Восход"
+          role="img"
+        >
+          <title>Восход</title>
+          <defs>
+            <linearGradient id="sunrise-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1a2a5e" />
+              <stop offset="60%" stopColor="#c45c1a" />
+              <stop offset="100%" stopColor="#f97316" />
+            </linearGradient>
+            <radialGradient id="sunrise-sun" cx="50%" cy="80%" r="50%">
+              <stop offset="0%" stopColor="#fef3a0" />
+              <stop offset="50%" stopColor="#fbbf24" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#sunrise-bg)" />
+          {/* Horizon glow */}
+          <ellipse
+            cx="16"
+            cy="24"
+            rx="14"
+            ry="5"
+            fill="#f97316"
+            opacity="0.35"
+          />
+          {/* Sun arc rising */}
+          <path
+            d="M6 24 Q16 10 26 24"
+            stroke="#fbbf24"
+            strokeWidth="0.6"
+            fill="none"
+            opacity="0.4"
+          />
+          {/* Sun half-circle at horizon */}
+          <path d="M10 24 A6 6 0 0 1 22 24 Z" fill="#fef3a0" />
+          <ellipse cx="16" cy="24" rx="6" ry="2" fill="#fef3a0" />
+          {/* Rays */}
+          <line
+            x1="16"
+            y1="14"
+            x2="16"
+            y2="11"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.8"
+          />
+          <line
+            x1="11"
+            y1="16"
+            x2="9"
+            y2="14"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.6"
+          />
+          <line
+            x1="21"
+            y1="16"
+            x2="23"
+            y2="14"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.6"
+          />
+          <line
+            x1="9"
+            y1="21"
+            x2="7"
+            y2="20"
+            stroke="#fbbf24"
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity="0.4"
+          />
+          <line
+            x1="23"
+            y1="21"
+            x2="25"
+            y2="20"
+            stroke="#fbbf24"
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity="0.4"
+          />
+          {/* Horizon line */}
+          <line
+            x1="3"
+            y1="24"
+            x2="29"
+            y2="24"
+            stroke="#f97316"
+            strokeWidth="1"
+            opacity="0.6"
+          />
+        </svg>
+      ),
+      dhuhr: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Зухр"
+          role="img"
+        >
+          <title>Зухр</title>
+          <defs>
+            <radialGradient id="dhuhr-bg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#1a3a5c" />
+              <stop offset="100%" stopColor="#0d1f3a" />
+            </radialGradient>
+            <radialGradient id="dhuhr-sun" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fff7c0" />
+              <stop offset="45%" stopColor="#fde047" />
+              <stop offset="100%" stopColor="#fb923c" />
+            </radialGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#dhuhr-bg)" />
+          {/* Outer glow halo */}
+          <circle cx="16" cy="16" r="11" fill="#f97316" opacity="0.12" />
+          <circle cx="16" cy="16" r="8.5" fill="#fbbf24" opacity="0.18" />
+          {/* Sun body */}
+          <circle cx="16" cy="16" r="6" fill="url(#dhuhr-sun)" />
+          {/* Rays */}
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
+            const rad = (angle * Math.PI) / 180;
+            const x1 = 16 + 7.5 * Math.cos(rad);
+            const y1 = 16 + 7.5 * Math.sin(rad);
+            const x2 = 16 + 10 * Math.cos(rad);
+            const y2 = 16 + 10 * Math.sin(rad);
+            return (
+              <line
+                key={angle}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#fde047"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                opacity="0.85"
+              />
+            );
+          })}
+        </svg>
+      ),
+      asr: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Аср"
+          role="img"
+        >
+          <title>Аср</title>
+          <defs>
+            <linearGradient id="asr-bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1a3a5c" />
+              <stop offset="100%" stopColor="#0f2840" />
+            </linearGradient>
+            <radialGradient id="asr-sun" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fde68a" />
+              <stop offset="100%" stopColor="#fb923c" />
+            </radialGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#asr-bg)" />
+          {/* Sun — slightly low in sky */}
+          <circle cx="20" cy="14" r="5" fill="url(#asr-sun)" opacity="0.9" />
+          {/* Rays */}
+          <line
+            x1="20"
+            y1="7"
+            x2="20"
+            y2="5"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.7"
+          />
+          <line
+            x1="26"
+            y1="14"
+            x2="28"
+            y2="14"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.6"
+          />
+          <line
+            x1="24"
+            y1="9"
+            x2="25.5"
+            y2="7.5"
+            stroke="#fbbf24"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+            opacity="0.6"
+          />
+          {/* Cloud */}
+          <ellipse cx="13" cy="21" rx="7" ry="4" fill="white" opacity="0.15" />
+          <ellipse
+            cx="10"
+            cy="20"
+            rx="5"
+            ry="3.5"
+            fill="white"
+            opacity="0.18"
+          />
+          <ellipse
+            cx="16"
+            cy="21"
+            rx="6"
+            ry="3.2"
+            fill="white"
+            opacity="0.20"
+          />
+          <ellipse cx="12" cy="19" rx="4" ry="3" fill="white" opacity="0.25" />
+          {/* Sun partially behind cloud */}
+          <ellipse
+            cx="18"
+            cy="20"
+            rx="3"
+            ry="2"
+            fill="#fb923c"
+            opacity="0.25"
+          />
+        </svg>
+      ),
+      maghrib: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Магриб"
+          role="img"
+        >
+          <title>Магриб</title>
+          <defs>
+            <linearGradient id="maghrib-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1a0a3e" />
+              <stop offset="45%" stopColor="#7b2d8b" />
+              <stop offset="75%" stopColor="#c0522a" />
+              <stop offset="100%" stopColor="#f97316" />
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#maghrib-sky)" />
+          {/* Horizon glow */}
+          <ellipse
+            cx="16"
+            cy="26"
+            rx="15"
+            ry="4"
+            fill="#f97316"
+            opacity="0.4"
+          />
+          {/* Sun at horizon */}
+          <ellipse
+            cx="16"
+            cy="26"
+            rx="5"
+            ry="2.5"
+            fill="#fde047"
+            opacity="0.9"
+          />
+          {/* Silhouette city skyline */}
+          <rect x="3" y="20" width="3" height="8" rx="0.5" fill="#0a0520" />
+          <rect x="5" y="17" width="2" height="11" rx="0.5" fill="#0a0520" />
+          <rect x="8" y="19" width="4" height="9" rx="0.5" fill="#0a0520" />
+          <rect x="11" y="15" width="2" height="13" rx="0.5" fill="#0a0520" />
+          <rect
+            x="12.5"
+            y="13"
+            width="1.5"
+            height="15"
+            rx="0.5"
+            fill="#0a0520"
+          />
+          {/* Dome (mosque) */}
+          <rect x="14" y="18" width="4" height="10" rx="0" fill="#0a0520" />
+          <path d="M14 18 Q16 14 18 18 Z" fill="#0a0520" />
+          {/* Minaret */}
+          <rect
+            x="17.5"
+            y="11"
+            width="1.5"
+            height="17"
+            rx="0.3"
+            fill="#0a0520"
+          />
+          <ellipse cx="18.25" cy="11" rx="1" ry="0.7" fill="#0a0520" />
+          {/* More buildings */}
+          <rect x="20" y="20" width="3" height="8" rx="0.5" fill="#0a0520" />
+          <rect x="22" y="17" width="2" height="11" rx="0.5" fill="#0a0520" />
+          <rect x="25" y="19" width="3" height="9" rx="0.5" fill="#0a0520" />
+          <rect x="27" y="21" width="3" height="7" rx="0.5" fill="#0a0520" />
+          {/* Stars */}
+          <circle cx="8" cy="8" r="0.7" fill="#e2d8ff" opacity="0.8" />
+          <circle cx="23" cy="6" r="0.9" fill="#e2d8ff" opacity="0.7" />
+          <circle cx="28" cy="11" r="0.6" fill="#e2d8ff" opacity="0.6" />
+        </svg>
+      ),
+      isha: (
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Иша"
+          role="img"
+        >
+          <title>Иша</title>
+          <defs>
+            <radialGradient id="isha-bg" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#0d1a4a" />
+              <stop offset="100%" stopColor="#060a1e" />
+            </radialGradient>
+          </defs>
+          <rect width="32" height="32" rx="8" fill="url(#isha-bg)" />
+          {/* Stars scattered */}
+          <circle cx="5" cy="6" r="0.7" fill="#d4c8ff" opacity="0.8" />
+          <circle cx="11" cy="4" r="0.5" fill="#e2d8ff" opacity="0.7" />
+          <circle cx="27" cy="7" r="0.8" fill="#d4c8ff" opacity="0.9" />
+          <circle cx="24" cy="13" r="0.5" fill="#e2d8ff" opacity="0.6" />
+          <circle cx="7" cy="16" r="0.6" fill="#d4c8ff" opacity="0.5" />
+          <circle cx="29" cy="20" r="0.5" fill="#e2d8ff" opacity="0.5" />
+          <circle cx="4" cy="24" r="0.6" fill="#d4c8ff" opacity="0.4" />
+          <circle cx="20" cy="27" r="0.5" fill="#e2d8ff" opacity="0.4" />
+          {/* Crescent moon */}
+          <path
+            d="M18 10 A6 6 0 1 1 12 17 A4.2 4.2 0 1 0 18 10 Z"
+            fill="#c8b8ff"
+            opacity="0.9"
+          />
+          {/* Shooting star */}
+          <line
+            x1="24"
+            y1="22"
+            x2="15"
+            y2="29"
+            stroke="#fde047"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.7"
+          />
+          <circle cx="24" cy="22" r="1.2" fill="#fde047" opacity="0.9" />
+          <line
+            x1="24"
+            y1="22"
+            x2="28"
+            y2="18"
+            stroke="#fde047"
+            strokeWidth="0.7"
+            strokeLinecap="round"
+            opacity="0.35"
+          />
+        </svg>
+      ),
+    };
+    return (
+      <span
+        className="shrink-0 inline-flex items-center justify-center"
+        style={{ width: 32, height: 32 }}
+      >
+        {icons[type] ?? <span className="text-xl">🕌</span>}
+      </span>
+    );
   };
 
   return (
@@ -767,7 +1205,7 @@ export default function PrayerTimesTab() {
                   } ${isPast && !isCurrent && !isNext && !isDone ? "opacity-50" : ""}`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{prayerIcons[prayer.key]}</span>
+                    <PrayerIcon type={prayer.key} />
                     <div>
                       <div
                         className={`font-semibold text-sm ${

@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
   Bell,
   BellOff,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
   Loader2,
   Lock,
   LogOut,
@@ -12,13 +14,17 @@ import {
   Pencil,
   ShieldCheck,
   Star,
+  Sun,
+  Wind,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
+import { tr, useLanguage } from "../hooks/useLanguage";
 import { useGetTasbihCounters } from "../hooks/useQueries";
+import PrayerGuide from "./PrayerGuide";
 
 // Специальный пароль автора (только для администратора)
 const AUTHOR_PASSWORD = "friday2026admin";
@@ -52,17 +58,6 @@ const PRAYER_NAME_MAP: Record<string, string> = {
   maghrib: "Магриб",
   isha: "Иша",
 };
-
-// ─── Utility: get read surahs with details ───────────────────────────────────
-function getReadSurahsDetail(): number[] {
-  try {
-    const raw = localStorage.getItem("quran_read_surahs");
-    if (raw) return JSON.parse(raw) as number[];
-  } catch {
-    /* ignore */
-  }
-  return [];
-}
 
 // ─── Notification Section ─────────────────────────────────────────────────────
 interface NotifSettings {
@@ -213,10 +208,11 @@ function scheduleNotificationsImpl(
 function NotificationSection() {
   const [permission, setPermission] = useState<NotificationPermission>(() => {
     if (typeof Notification === "undefined") return "denied";
-    // Always sync with actual browser state
     return Notification.permission;
   });
   const [isDeniedMsg, setIsDeniedMsg] = useState(false);
+  // Accordion open — always starts closed
+  const [isOpen, setIsOpen] = useState(false);
 
   const [settings, setSettings] = useState<NotifSettings>(() => ({
     iftar: localStorage.getItem("notif_iftar") !== "false",
@@ -230,7 +226,6 @@ function NotificationSection() {
 
   const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Schedule on mount and when settings change
   useEffect(() => {
     if (permission === "granted") {
       scheduleNotificationsImpl(settings, timeoutRefs);
@@ -249,6 +244,7 @@ function NotificationSection() {
     setPermission(result);
     localStorage.setItem("notif_permission", result);
     if (result === "granted") {
+      setIsOpen(true);
       toast.success("Уведомления включены!");
     } else if (result === "denied") {
       setIsDeniedMsg(true);
@@ -256,8 +252,7 @@ function NotificationSection() {
   };
 
   const handleToggle = (key: keyof NotifSettings, value: boolean) => {
-    const localKey = `notif_${key}`;
-    localStorage.setItem(localKey, String(value));
+    localStorage.setItem(`notif_${key}`, String(value));
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -306,88 +301,121 @@ function NotificationSection() {
   ];
 
   return (
-    <div className="space-y-3">
-      {permission !== "granted" ? (
-        /* ── Phase 1: request permission ── */
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="glass-card rounded-2xl p-5 space-y-4"
-        >
-          <div className="flex items-center gap-2">
-            <Bell size={16} className="text-orange-400" />
-            <span className="text-sm font-bold text-foreground">
-              Уведомления
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="glass-card rounded-2xl overflow-hidden"
+    >
+      {/* ── Header row — always visible ── */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-orange-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+        onClick={() => permission === "granted" && setIsOpen((v) => !v)}
+        data-ocid="profile.notifications.settings.toggle"
+        aria-expanded={isOpen}
+      >
+        {/* Bell icon */}
+        <div className="w-7 h-7 rounded-lg bg-orange-500/15 flex items-center justify-center shrink-0">
+          <Bell size={14} className="text-orange-400" />
+        </div>
+
+        {/* Label */}
+        <span className="text-sm font-bold text-foreground flex-1">
+          Настройки уведомлений
+        </span>
+
+        {/* Right side: badge or enable button */}
+        {permission === "granted" ? (
+          <>
+            <span className="flex items-center gap-1 text-xs text-green-400 font-semibold shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              Активно
             </span>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Включите уведомления, чтобы не пропустить время намаза, сухура и
-            ифтара
-          </p>
-          {isDeniedMsg && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 rounded-xl p-3"
+              animate={{ rotate: isOpen ? 180 : 0 }}
+              transition={{ duration: 0.25 }}
+              className="ml-1 shrink-0"
             >
-              <BellOff size={14} />
+              <ChevronDown size={16} className="text-foreground/40" />
+            </motion.div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-orange-500 text-black hover:bg-orange-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleEnableNotifications();
+            }}
+            data-ocid="profile.notifications.enable.button"
+          >
+            <Bell size={11} />
+            Включить
+          </button>
+        )}
+      </button>
+
+      {/* ── Denied message ── */}
+      <AnimatePresence>
+        {isDeniedMsg && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 mx-4 mb-3 rounded-xl p-3">
+              <BellOff size={13} className="shrink-0" />
               <span>
                 Уведомления заблокированы в браузере. Разрешите их в настройках
                 сайта.
               </span>
-            </motion.div>
-          )}
-          <Button
-            className="w-full bg-primary text-primary-foreground hover:bg-orange-400 font-semibold h-10"
-            onClick={() => void handleEnableNotifications()}
-            data-ocid="profile.notifications.enable.button"
-          >
-            <Bell size={14} className="mr-2" />
-            Включить уведомления
-          </Button>
-        </motion.div>
-      ) : (
-        /* ── Phase 2: settings panel ── */
-        <motion.div
-          initial={{ opacity: 0, y: -8, scaleY: 0.97 }}
-          animate={{ opacity: 1, y: 0, scaleY: 1 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="glass-card rounded-2xl p-5 space-y-4 origin-top"
-        >
-          <div className="flex items-center gap-2">
-            <Bell size={16} className="text-orange-400" />
-            <span className="text-sm font-bold text-foreground">
-              Настройки уведомлений
-            </span>
-            <span className="ml-auto text-xs text-green-400 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-              Активно
-            </span>
-          </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <div className="space-y-0.5">
-            {toggleRows.map((row, i) => (
-              <motion.div
-                key={row.key}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.25 }}
-                className="flex items-center justify-between py-2.5 border-b border-orange-500/8 last:border-0"
-              >
-                <span className="text-sm text-foreground/80">{row.label}</span>
-                <Switch
-                  checked={settings[row.key]}
-                  onCheckedChange={(val) => handleToggle(row.key, val)}
-                  data-ocid={row.ocid}
-                  className="data-[state=checked]:bg-orange-500"
-                />
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-    </div>
+      {/* ── Accordion: toggle rows (шторка) ── */}
+      <AnimatePresence initial={false}>
+        {permission === "granted" && isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div
+              className="px-4 pb-3 space-y-0"
+              style={{ borderTop: "1px solid oklch(0.55 0.18 45 / 0.1)" }}
+            >
+              {toggleRows.map((row, i) => (
+                <motion.div
+                  key={row.key}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.2 }}
+                  className="flex items-center justify-between py-2.5 border-b last:border-0"
+                  style={{ borderColor: "oklch(0.55 0.18 45 / 0.07)" }}
+                >
+                  <span className="text-sm text-foreground/80">
+                    {row.label}
+                  </span>
+                  <Switch
+                    checked={settings[row.key]}
+                    onCheckedChange={(val) => handleToggle(row.key, val)}
+                    data-ocid={row.ocid}
+                    className="data-[state=checked]:bg-orange-500"
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -621,7 +649,9 @@ function TodayNamazSection() {
   return (
     <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
       <div className="flex items-center gap-1.5">
-        <span className="text-base">🕌</span>
+        <div className="w-5 h-5 rounded-md bg-orange-500/15 flex items-center justify-center">
+          <Sun size={12} className="text-orange-400" />
+        </div>
         <span className="text-xs font-bold text-foreground">Намаз</span>
         <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
           {count}/5
@@ -686,14 +716,21 @@ function TodayNamazSection() {
               >
                 {PRAYER_NAME_MAP[key].slice(0, 3)}
               </span>
-              <span className="text-xs">{done ? "✅" : "◻️"}</span>
+              <span className="flex items-center justify-center">
+                {done ? (
+                  <CheckCircle2 size={13} className="text-green-400" />
+                ) : (
+                  <div className="w-3 h-3 rounded-sm border border-foreground/20" />
+                )}
+              </span>
             </motion.div>
           );
         })}
       </div>
       {count === 5 && (
-        <p className="text-center text-[10px] text-green-400 font-semibold">
-          МашаАллах! 🤲
+        <p className="text-center text-[10px] text-green-400 font-semibold flex items-center justify-center gap-1">
+          <CheckCircle2 size={11} className="text-green-400" />
+          МашаАллах!
         </p>
       )}
     </div>
@@ -711,7 +748,9 @@ function TasbihStatsCard({
   return (
     <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
       <div className="flex items-center gap-1.5">
-        <span className="text-base">📿</span>
+        <div className="w-5 h-5 rounded-md bg-orange-500/15 flex items-center justify-center">
+          <Wind size={12} className="text-orange-400" />
+        </div>
         <span className="text-xs font-bold text-foreground">Тасбих</span>
         <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
           {totalTasbih}
@@ -767,98 +806,6 @@ function TasbihStatsCard({
   );
 }
 
-// ─── Quran Stats Section ──────────────────────────────────────────────────────
-function QuranStatsSection() {
-  const [expanded, setExpanded] = useState(false);
-  const readIds = getReadSurahsDetail();
-  const count = readIds.length;
-
-  // Import surah names for display
-  const surahNames: Record<number, string> = {
-    1: "Аль-Фатиха",
-    2: "Аль-Бакара",
-    3: "Аль-Имран",
-    4: "Ан-Ниса",
-    5: "Аль-Маида",
-    6: "Аль-Анам",
-    7: "Аль-Аараф",
-    8: "Аль-Анфаль",
-    9: "Ат-Тауба",
-    10: "Юнус",
-    36: "Ясин",
-    55: "Ар-Рахман",
-    56: "Аль-Вакия",
-    67: "Аль-Мульк",
-    78: "Ан-Наба",
-    110: "Ан-Наср",
-    111: "Аль-Масад",
-    112: "Аль-Ихлас",
-    113: "Аль-Фалак",
-    114: "Ан-Нас",
-  };
-
-  const surahRakaat: Record<number, number> = {
-    1: 7,
-    112: 4,
-    113: 5,
-    114: 6,
-  };
-
-  return (
-    <div className="glass-card rounded-2xl p-5 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-base">📖</span>
-        <span className="text-sm font-bold text-foreground">Коран</span>
-        <span className="ml-auto text-green-400 font-bold text-lg leading-none">
-          {count} сур
-        </span>
-        {count > 0 && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="ml-2 text-xs text-orange-400 hover:text-orange-300 font-semibold transition-colors"
-            data-ocid="profile.quran.expand.toggle"
-          >
-            {expanded ? "Скрыть" : "Подробнее"}
-          </button>
-        )}
-      </div>
-      {count === 0 && (
-        <p className="text-xs text-foreground/40">
-          Ни одной суры ещё не прочитано
-        </p>
-      )}
-      {expanded && count > 0 && (
-        <div className="space-y-2 pt-1">
-          <Separator className="bg-orange-500/10" />
-          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-            {readIds.map((id) => (
-              <div
-                key={id}
-                className="flex items-center justify-between text-xs py-1"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-green-500/10 border border-green-500/20 flex items-center justify-center text-[9px] font-bold text-green-400">
-                    {id}
-                  </span>
-                  <span className="text-foreground/70">
-                    {surahNames[id] || `Сура ${id}`}
-                  </span>
-                </div>
-                {surahRakaat[id] && (
-                  <span className="text-foreground/40">
-                    {surahRakaat[id]} аятов
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── User ProfileScreen ───────────────────────────────────────────────────────
 function ProfileScreen() {
   const {
@@ -869,6 +816,8 @@ function ProfileScreen() {
     isLoading,
   } = useFirebaseAuth();
   const { data: tasbihCounters } = useGetTasbihCounters();
+  const lang = useLanguage();
+  const [showPrayerGuide, setShowPrayerGuide] = useState(false);
 
   const localStoredName = localStorage.getItem("user_display_name") || "";
   const displayName =
@@ -931,6 +880,10 @@ function ProfileScreen() {
         <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
       </div>
     );
+  }
+
+  if (showPrayerGuide) {
+    return <PrayerGuide onBack={() => setShowPrayerGuide(false)} />;
   }
 
   return (
@@ -1063,8 +1016,8 @@ function ProfileScreen() {
         />
       </div>
 
-      {/* ── Quran Stats — full width ── */}
-      <QuranStatsSection />
+      {/* ── Prayer Guide Card ── */}
+      <PrayerGuideCard onOpen={() => setShowPrayerGuide(true)} />
 
       {/* ── Sign out ── */}
       <Button
@@ -1074,7 +1027,7 @@ function ProfileScreen() {
         data-ocid="profile.signout.button"
       >
         <LogOut size={16} className="mr-2" />
-        Выйти из аккаунта
+        {tr("profile.signout", lang)}
       </Button>
 
       <CaffeineFooter />
@@ -1087,6 +1040,11 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
   const { data: tasbihCounters } = useGetTasbihCounters();
   const totalTasbih =
     tasbihCounters?.reduce((acc, c) => acc + Number(c.count), 0) ?? 0;
+  const [showPrayerGuide, setShowPrayerGuide] = useState(false);
+
+  if (showPrayerGuide) {
+    return <PrayerGuide onBack={() => setShowPrayerGuide(false)} />;
+  }
 
   return (
     <motion.div
@@ -1163,8 +1121,8 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
         />
       </div>
 
-      {/* ── Quran Stats ── */}
-      <QuranStatsSection />
+      {/* ── Prayer Guide Card ── */}
+      <PrayerGuideCard onOpen={() => setShowPrayerGuide(true)} />
 
       {/* ── Sign out ── */}
       <Button
@@ -1179,6 +1137,108 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
 
       <CaffeineFooter />
     </motion.div>
+  );
+}
+
+// ─── Prayer Guide Card ────────────────────────────────────────────────────────
+function PrayerGuideCard({ onOpen }: { onOpen: () => void }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onOpen}
+      whileTap={{ scale: 0.97 }}
+      className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+      style={{
+        background:
+          "linear-gradient(135deg, oklch(0.14 0.025 45) 0%, oklch(0.18 0.04 45) 60%, oklch(0.22 0.06 45) 100%)",
+        border: "1px solid oklch(0.55 0.18 45 / 0.25)",
+        boxShadow: "0 4px 24px oklch(0.55 0.18 45 / 0.1)",
+      }}
+      data-ocid="profile.prayer_guide.button"
+    >
+      <div className="flex items-center gap-4 px-4 py-4">
+        {/* Icon */}
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+          style={{
+            background: "oklch(0.55 0.18 45 / 0.18)",
+            border: "1px solid oklch(0.55 0.18 45 / 0.3)",
+          }}
+        >
+          {/* Prayer mat icon */}
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 28 28"
+            fill="none"
+            aria-hidden="true"
+          >
+            <rect
+              x="3"
+              y="10"
+              width="22"
+              height="14"
+              rx="2"
+              fill="none"
+              stroke="#f97316"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M7 10 Q14 3 21 10"
+              fill="none"
+              stroke="#f97316"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="14"
+              cy="14"
+              r="2.5"
+              fill="none"
+              stroke="#f97316"
+              strokeWidth="1.5"
+            />
+            <line
+              x1="7"
+              y1="18"
+              x2="21"
+              y2="18"
+              stroke="#f97316"
+              strokeWidth="1"
+              strokeOpacity="0.4"
+            />
+          </svg>
+        </div>
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-foreground">
+            Намаз для начинающих
+          </div>
+          <div className="text-xs text-foreground/40 mt-0.5">
+            Пошаговое руководство с позами
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            {["Фаджр", "Зухр/Аср", "Магриб"].map((label) => (
+              <span
+                key={label}
+                className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{
+                  background: "oklch(0.55 0.18 45 / 0.12)",
+                  color: "#f97316",
+                  border: "1px solid oklch(0.55 0.18 45 / 0.2)",
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Arrow */}
+        <BookOpen size={18} className="text-orange-400/50 shrink-0" />
+      </div>
+    </motion.button>
   );
 }
 
