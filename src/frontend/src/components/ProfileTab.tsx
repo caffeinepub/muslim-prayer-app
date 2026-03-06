@@ -5,27 +5,20 @@ import { Switch } from "@/components/ui/switch";
 import {
   Bell,
   BellOff,
-  BookOpen,
-  CheckCircle2,
-  Globe,
   Loader2,
   Lock,
   LogOut,
-  Mail,
   Moon,
+  Pencil,
   ShieldCheck,
   Star,
-  Trophy,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
-import {
-  useGetPrayerSettings,
-  useGetTasbihCounters,
-} from "../hooks/useQueries";
+import { useGetTasbihCounters } from "../hooks/useQueries";
 
 // Специальный пароль автора (только для администратора)
 const AUTHOR_PASSWORD = "friday2026admin";
@@ -37,103 +30,38 @@ const pageVariants = {
   exit: { opacity: 0, y: -12 },
 };
 
-// ─── Utility: read achievement stats from localStorage ───────────────────────
-function getAchievementStats() {
-  const tasbihTotal = Number(localStorage.getItem("tasbih_total_count") || "0");
-  const prayersChecked = Number(localStorage.getItem("prayers_checked") || "0");
-  const streak = Number(localStorage.getItem("usage_streak") || "0");
-
-  let quranRead: number[] = [];
+// ─── Utility: get today's completed prayers ───────────────────────────────────
+function getTodayPrayersDone(): string[] {
   try {
-    const raw = localStorage.getItem("quran_read_surahs");
-    if (raw) quranRead = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = localStorage.getItem("prayer_completed_today");
+    if (raw) {
+      const data = JSON.parse(raw) as { date: string; keys: string[] };
+      if (data.date === today) return data.keys;
+    }
   } catch {
     /* ignore */
   }
-
-  return {
-    tasbihTotal,
-    prayersChecked,
-    streak,
-    quranReadCount: quranRead.length,
-  };
+  return [];
 }
 
-// ─── Achievement level getters ────────────────────────────────────────────────
-function getTasbihLevel(total: number) {
-  if (total >= 10000) return { label: "Мастер", level: 5, max: 5 };
-  if (total >= 2000) return { label: "Знаток", level: 4, max: 5 };
-  if (total >= 500) return { label: "Усердный", level: 3, max: 5 };
-  if (total >= 100) return { label: "Практикующий", level: 2, max: 5 };
-  return { label: "Начинающий", level: 1, max: 5 };
-}
+const PRAYER_NAME_MAP: Record<string, string> = {
+  fajr: "Фаджр",
+  dhuhr: "Зухр",
+  asr: "Аср",
+  maghrib: "Магриб",
+  isha: "Иша",
+};
 
-function getQuranLevel(count: number) {
-  if (count >= 114) return { label: "Знаток Корана", level: 5, max: 5 };
-  if (count >= 50) return { label: "Хафиз на пути", level: 4, max: 5 };
-  if (count >= 20) return { label: "Знаток", level: 3, max: 5 };
-  if (count >= 5) return { label: "Читатель", level: 2, max: 5 };
-  if (count >= 1) return { label: "Первые шаги", level: 1, max: 5 };
-  return { label: "Не начато", level: 0, max: 5 };
-}
-
-function getPrayerLevel(count: number) {
-  if (count >= 100) return { label: "Столп веры", level: 4, max: 4 };
-  if (count >= 25) return { label: "Верный", level: 3, max: 4 };
-  if (count >= 5) return { label: "Намазник", level: 2, max: 4 };
-  if (count >= 1) return { label: "Начало пути", level: 1, max: 4 };
-  return { label: "Не начато", level: 0, max: 4 };
-}
-
-function getStreakLevel(days: number) {
-  if (days >= 30) return { label: "Столп", level: 5, max: 5 };
-  if (days >= 14) return { label: "Привычка", level: 4, max: 5 };
-  if (days >= 7) return { label: "Неделя веры", level: 3, max: 5 };
-  if (days >= 3) return { label: "Регулярность", level: 2, max: 5 };
-  if (days >= 1) return { label: "Старт", level: 1, max: 5 };
-  return { label: "Не начато", level: 0, max: 5 };
-}
-
-// ─── Badges ───────────────────────────────────────────────────────────────────
-function getBadges(
-  tasbihTotal: number,
-  quranReadCount: number,
-  prayersChecked: number,
-  streak: number,
-) {
-  const badges = [
-    {
-      id: "first_tasbih",
-      emoji: "🕌",
-      label: "Первый шаг",
-      unlocked: tasbihTotal >= 1,
-    },
-    {
-      id: "tasbih_33",
-      emoji: "📿",
-      label: "33 зикра",
-      unlocked: tasbihTotal >= 33,
-    },
-    {
-      id: "al_fatiha",
-      emoji: "📖",
-      label: "Аль-Фатиха",
-      unlocked: quranReadCount >= 1,
-    },
-    {
-      id: "streak_7",
-      emoji: "⭐",
-      label: "7 дней подряд",
-      unlocked: streak >= 7,
-    },
-    {
-      id: "ramadan_spirit",
-      emoji: "🌙",
-      label: "Рамадан духа",
-      unlocked: prayersChecked >= 50,
-    },
-  ];
-  return badges;
+// ─── Utility: get read surahs with details ───────────────────────────────────
+function getReadSurahsDetail(): number[] {
+  try {
+    const raw = localStorage.getItem("quran_read_surahs");
+    if (raw) return JSON.parse(raw) as number[];
+  } catch {
+    /* ignore */
+  }
+  return [];
 }
 
 // ─── Notification Section ─────────────────────────────────────────────────────
@@ -502,132 +430,59 @@ function AvatarCircle({
   );
 }
 
-// ─── Achievement Card ─────────────────────────────────────────────────────────
-function AchievementCard({
-  icon,
-  title,
-  levelLabel,
-  level,
-  maxLevel,
-  value,
-  valueLabel,
-  color,
-  delay,
-}: {
-  icon: string;
-  title: string;
-  levelLabel: string;
-  level: number;
-  maxLevel: number;
-  value: number;
-  valueLabel: string;
-  color: string;
-  delay: number;
-}) {
-  const progressPct = maxLevel > 0 ? Math.round((level / maxLevel) * 100) : 0;
-  const isStarted = level > 0;
-
+// ─── Google Sign-In Button ─────────────────────────────────────────────────────
+function GoogleIcon() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.35, ease: "easeOut" }}
-      className="glass-card rounded-2xl p-4 flex flex-col gap-2.5 relative overflow-hidden"
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
     >
-      {/* Background glow */}
-      {isStarted && (
-        <div
-          className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-25"
-          style={{ background: color }}
-        />
-      )}
-
-      {/* Icon + title */}
-      <div className="flex items-center gap-2">
-        <motion.span
-          className="text-2xl leading-none"
-          animate={{ scale: [1, 1.15, 1], rotate: [0, -5, 5, 0] }}
-          transition={{
-            duration: 3,
-            repeat: Number.POSITIVE_INFINITY,
-            delay,
-            ease: "easeInOut",
-          }}
-        >
-          {icon}
-        </motion.span>
-        <span className="text-xs font-semibold text-foreground/80 truncate">
-          {title}
-        </span>
-      </div>
-
-      {/* Level name */}
-      <div
-        className="text-sm font-bold truncate"
-        style={{ color: isStarted ? color : "var(--muted-foreground)" }}
-      >
-        {levelLabel}
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 bg-foreground/10 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full rounded-full"
-          style={{ background: color }}
-          initial={{ width: 0 }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ delay: delay + 0.2, duration: 0.6, ease: "easeOut" }}
-        />
-      </div>
-
-      {/* Counts */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{valueLabel}</span>
-        <span className="text-xs font-bold" style={{ color }}>
-          {value}
-        </span>
-      </div>
-
-      {/* Level pip track */}
-      <div className="h-1 bg-foreground/10 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${progressPct}%`,
-            background: color,
-          }}
-        />
-      </div>
-    </motion.div>
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
   );
 }
 
 // ─── LoginScreen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
-  const { signInWithEmail } = useFirebaseAuth();
+  const { signInWithGoogle } = useFirebaseAuth();
 
-  const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "sent">("email");
-  const [isSending, setIsSending] = useState(false);
-
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [authorPassword, setAuthorPassword] = useState("");
   const [authorError, setAuthorError] = useState(false);
 
-  const handleSendLink = async () => {
-    if (!email.trim() || !email.includes("@")) {
-      toast.error("Введите корректный email");
-      return;
-    }
-    setIsSending(true);
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
     try {
-      await signInWithEmail(email.trim().toLowerCase());
-      setStep("sent");
+      await signInWithGoogle();
+      toast.success("Добро пожаловать!");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Ошибка отправки письма",
-      );
+      const msg = err instanceof Error ? err.message : "";
+      if (
+        !msg.includes("popup-closed-by-user") &&
+        !msg.includes("cancelled-popup-request")
+      ) {
+        toast.error("Ошибка входа через Google. Попробуйте ещё раз.");
+      }
     } finally {
-      setIsSending(false);
+      setIsSigningIn(false);
     }
   };
 
@@ -666,89 +521,41 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
       </div>
 
       <div className="w-full max-w-sm space-y-4">
-        {/* Email magic link */}
-        <div className="glass-card rounded-2xl p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Mail size={16} className="text-orange-400" />
-            <span className="text-sm font-semibold text-foreground">
-              Войти по email
-            </span>
+        {/* Google Sign-In */}
+        <motion.div
+          className="glass-card rounded-2xl p-5 space-y-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <div className="text-center space-y-1">
+            <p className="text-sm font-semibold text-foreground">
+              Войти в аккаунт
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Сохраняйте настройки и прогресс между устройствами
+            </p>
           </div>
 
-          <AnimatePresence mode="wait">
-            {step === "email" ? (
-              <motion.div
-                key="email-step"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-3"
-              >
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Введите ваш email — мы отправим письмо со ссылкой для входа.
-                </p>
-                <Input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void handleSendLink()}
-                  className="bg-secondary/50 border-orange-500/20 focus:border-orange-500/50 h-10"
-                  data-ocid="profile.email.input"
-                  autoComplete="email"
-                />
-                <Button
-                  className="w-full bg-primary text-primary-foreground hover:bg-orange-400 font-semibold h-10"
-                  onClick={() => void handleSendLink()}
-                  disabled={isSending || !email.trim()}
-                  data-ocid="profile.email.submit_button"
-                >
-                  {isSending ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" />
-                      Отправка...
-                    </span>
-                  ) : (
-                    "Отправить ссылку"
-                  )}
-                </Button>
-              </motion.div>
+          <Button
+            className="w-full h-11 bg-white hover:bg-gray-50 text-gray-800 font-semibold border border-gray-200 shadow-sm gap-2.5 transition-all duration-200 hover:shadow-md"
+            onClick={() => void handleGoogleSignIn()}
+            disabled={isSigningIn}
+            data-ocid="profile.google.submit_button"
+          >
+            {isSigningIn ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin text-gray-500" />
+                <span className="text-gray-600">Вход...</span>
+              </span>
             ) : (
-              <motion.div
-                key="sent-step"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.25 }}
-                className="space-y-4 text-center"
-                data-ocid="profile.email.success_state"
-              >
-                <div className="flex justify-center">
-                  <CheckCircle2 size={44} className="text-orange-400" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    Письмо отправлено!
-                  </p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Проверьте почту{" "}
-                    <span className="text-orange-400 font-medium">{email}</span>{" "}
-                    и нажмите кнопку «Подтвердить» в письме.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline underline-offset-2 w-full text-center"
-                  onClick={() => setStep("email")}
-                  data-ocid="profile.email.back_button"
-                >
-                  Изменить email
-                </button>
-              </motion.div>
+              <>
+                <GoogleIcon />
+                <span>Войти через Google</span>
+              </>
             )}
-          </AnimatePresence>
-        </div>
+          </Button>
+        </motion.div>
 
         {/* Author login */}
         <div className="glass-card rounded-2xl p-5 space-y-3 border border-orange-500/10">
@@ -805,111 +612,249 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
   );
 }
 
-// ─── Achievements Section ─────────────────────────────────────────────────────
-function AchievementsSection() {
-  const { tasbihTotal, prayersChecked, streak, quranReadCount } =
-    getAchievementStats();
-
-  const tasbihLvl = getTasbihLevel(tasbihTotal);
-  const quranLvl = getQuranLevel(quranReadCount);
-  const prayerLvl = getPrayerLevel(prayersChecked);
-  const streakLvl = getStreakLevel(streak);
-  const badges = getBadges(tasbihTotal, quranReadCount, prayersChecked, streak);
-  const unlockedCount = badges.filter((b) => b.unlocked).length;
+// ─── Today's Namaz Section (compact for 2-col grid) ──────────────────────────
+function TodayNamazSection() {
+  const prayersDone = getTodayPrayersDone();
+  const count = prayersDone.length;
+  const allFive = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 
   return (
-    <div className="space-y-4">
-      {/* Section header */}
-      <div className="flex items-center gap-2">
-        <Trophy size={16} className="text-orange-400" />
-        <span className="text-sm font-bold text-foreground">Достижения</span>
-        <span className="ml-auto text-xs text-orange-400 font-semibold">
-          {unlockedCount}/{badges.length} 🏅
+    <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
+      <div className="flex items-center gap-1.5">
+        <span className="text-base">🕌</span>
+        <span className="text-xs font-bold text-foreground">Намаз</span>
+        <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
+          {count}/5
         </span>
       </div>
-
-      {/* Achievement cards grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <AchievementCard
-          icon="📿"
-          title="Тасбих"
-          levelLabel={tasbihLvl.label}
-          level={tasbihLvl.level}
-          maxLevel={tasbihLvl.max}
-          value={tasbihTotal}
-          valueLabel="всего зикров"
-          color="#f97316"
-          delay={0.05}
-        />
-        <AchievementCard
-          icon="📖"
-          title="Коран"
-          levelLabel={quranLvl.label}
-          level={quranLvl.level}
-          maxLevel={quranLvl.max}
-          value={quranReadCount}
-          valueLabel="сур прочитано"
-          color="#22c55e"
-          delay={0.1}
-        />
-        <AchievementCard
-          icon="🕌"
-          title="Намаз"
-          levelLabel={prayerLvl.label}
-          level={prayerLvl.level}
-          maxLevel={prayerLvl.max}
-          value={prayersChecked}
-          valueLabel="намазов совершено"
-          color="#a78bfa"
-          delay={0.15}
-        />
-        <AchievementCard
-          icon="🔥"
-          title="Серия"
-          levelLabel={streakLvl.label}
-          level={streakLvl.level}
-          maxLevel={streakLvl.max}
-          value={streak}
-          valueLabel="дней подряд"
-          color="#fb923c"
-          delay={0.2}
-        />
-      </div>
-
-      {/* Badges row */}
-      <div className="glass-card rounded-2xl p-4 space-y-3">
-        <div className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">
-          Медали
+      {/* Progress arc */}
+      <div className="flex items-center justify-center">
+        <div className="relative w-16 h-16">
+          <svg
+            viewBox="0 0 64 64"
+            className="w-full h-full -rotate-90"
+            role="img"
+            aria-label="Прогресс намазов"
+          >
+            <circle
+              cx="32"
+              cy="32"
+              r="26"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="5"
+              className="text-foreground/10"
+            />
+            <motion.circle
+              cx="32"
+              cy="32"
+              r="26"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="5"
+              strokeLinecap="round"
+              className="text-orange-500"
+              strokeDasharray={`${2 * Math.PI * 26}`}
+              initial={{ strokeDashoffset: 2 * Math.PI * 26 }}
+              animate={{
+                strokeDashoffset: 2 * Math.PI * 26 * (1 - count / 5),
+              }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-lg font-bold text-foreground">{count}</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {badges.map((badge, index) => (
+      </div>
+      <div className="flex gap-1">
+        {allFive.map((key) => {
+          const done = prayersDone.includes(key);
+          return (
             <motion.div
-              key={badge.id}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: index * 0.06 }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-300 ${
-                badge.unlocked
-                  ? "bg-orange-500/15 border-orange-500/30 text-orange-300"
-                  : "bg-foreground/5 border-foreground/10 text-foreground/25 grayscale"
+              key={key}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-lg border transition-all duration-300 ${
+                done
+                  ? "bg-green-500/15 border-green-500/30"
+                  : "bg-foreground/5 border-foreground/10"
               }`}
             >
-              <motion.span
-                animate={badge.unlocked ? { y: [0, -3, 0] } : {}}
-                transition={{
-                  duration: 2.5,
-                  repeat: Number.POSITIVE_INFINITY,
-                  delay: index * 0.4,
-                  ease: "easeInOut",
-                }}
+              <span
+                className={`text-[7px] font-semibold leading-none ${done ? "text-green-400" : "text-foreground/25"}`}
               >
-                {badge.emoji}
-              </motion.span>
-              <span>{badge.label}</span>
+                {PRAYER_NAME_MAP[key].slice(0, 3)}
+              </span>
+              <span className="text-xs">{done ? "✅" : "◻️"}</span>
             </motion.div>
-          ))}
+          );
+        })}
+      </div>
+      {count === 5 && (
+        <p className="text-center text-[10px] text-green-400 font-semibold">
+          МашаАллах! 🤲
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Tasbih Stats Card (compact for 2-col grid) ───────────────────────────────
+function TasbihStatsCard({
+  totalTasbih,
+  tasbihCounters,
+}: {
+  totalTasbih: number;
+  tasbihCounters?: Array<{ name: string; count: bigint; target: bigint }>;
+}) {
+  return (
+    <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
+      <div className="flex items-center gap-1.5">
+        <span className="text-base">📿</span>
+        <span className="text-xs font-bold text-foreground">Тасбих</span>
+        <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
+          {totalTasbih}
+        </span>
+      </div>
+      {/* Big count display */}
+      <div className="flex items-center justify-center flex-1">
+        <div className="text-center">
+          <motion.div
+            key={totalTasbih}
+            initial={{ scale: 1.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="text-3xl font-display font-bold text-orange-400"
+          >
+            {totalTasbih}
+          </motion.div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">зикров</div>
         </div>
       </div>
+      {/* Mini progress bars */}
+      {tasbihCounters && tasbihCounters.length > 0 && (
+        <div className="space-y-1.5">
+          {tasbihCounters.slice(0, 2).map((counter) => {
+            const pct = Math.min(
+              (Number(counter.count) / Number(counter.target)) * 100,
+              100,
+            );
+            return (
+              <div key={counter.name} className="space-y-0.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted-foreground truncate max-w-[80px]">
+                    {counter.name}
+                  </span>
+                  <span className="text-orange-400/70 font-medium shrink-0 ml-1">
+                    {Number(counter.count)}/{Number(counter.target)}
+                  </span>
+                </div>
+                <div className="h-1 bg-foreground/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-orange-500/70 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Quran Stats Section ──────────────────────────────────────────────────────
+function QuranStatsSection() {
+  const [expanded, setExpanded] = useState(false);
+  const readIds = getReadSurahsDetail();
+  const count = readIds.length;
+
+  // Import surah names for display
+  const surahNames: Record<number, string> = {
+    1: "Аль-Фатиха",
+    2: "Аль-Бакара",
+    3: "Аль-Имран",
+    4: "Ан-Ниса",
+    5: "Аль-Маида",
+    6: "Аль-Анам",
+    7: "Аль-Аараф",
+    8: "Аль-Анфаль",
+    9: "Ат-Тауба",
+    10: "Юнус",
+    36: "Ясин",
+    55: "Ар-Рахман",
+    56: "Аль-Вакия",
+    67: "Аль-Мульк",
+    78: "Ан-Наба",
+    110: "Ан-Наср",
+    111: "Аль-Масад",
+    112: "Аль-Ихлас",
+    113: "Аль-Фалак",
+    114: "Ан-Нас",
+  };
+
+  const surahRakaat: Record<number, number> = {
+    1: 7,
+    112: 4,
+    113: 5,
+    114: 6,
+  };
+
+  return (
+    <div className="glass-card rounded-2xl p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-base">📖</span>
+        <span className="text-sm font-bold text-foreground">Коран</span>
+        <span className="ml-auto text-green-400 font-bold text-lg leading-none">
+          {count} сур
+        </span>
+        {count > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="ml-2 text-xs text-orange-400 hover:text-orange-300 font-semibold transition-colors"
+            data-ocid="profile.quran.expand.toggle"
+          >
+            {expanded ? "Скрыть" : "Подробнее"}
+          </button>
+        )}
+      </div>
+      {count === 0 && (
+        <p className="text-xs text-foreground/40">
+          Ни одной суры ещё не прочитано
+        </p>
+      )}
+      {expanded && count > 0 && (
+        <div className="space-y-2 pt-1">
+          <Separator className="bg-orange-500/10" />
+          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+            {readIds.map((id) => (
+              <div
+                key={id}
+                className="flex items-center justify-between text-xs py-1"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-md bg-green-500/10 border border-green-500/20 flex items-center justify-center text-[9px] font-bold text-green-400">
+                    {id}
+                  </span>
+                  <span className="text-foreground/70">
+                    {surahNames[id] || `Сура ${id}`}
+                  </span>
+                </div>
+                {surahRakaat[id] && (
+                  <span className="text-foreground/40">
+                    {surahRakaat[id]} аятов
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -923,45 +868,53 @@ function ProfileScreen() {
     saveProfile,
     isLoading,
   } = useFirebaseAuth();
-  const { data: prayerSettings } = useGetPrayerSettings();
   const { data: tasbihCounters } = useGetTasbihCounters();
 
+  const localStoredName = localStorage.getItem("user_display_name") || "";
   const displayName =
+    localStoredName ||
     profile?.name ||
     (firebaseUser?.email ? firebaseUser.email.split("@")[0] : null) ||
     "";
   const displayEmail = firebaseUser?.email || "";
 
+  const [isEditingName, setIsEditingName] = useState(false);
   const [nameEdit, setNameEdit] = useState(displayName);
+  const [savedName, setSavedName] = useState(localStoredName || displayName);
   const [isSavingName, setIsSavingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Gender selection (male = Мусульманин, female = Мусульманка)
-  const [gender, setGender] = useState<"male" | "female">(() => {
-    const saved = localStorage.getItem("user_gender");
-    return saved === "female" ? "female" : "male";
-  });
-
-  const handleGenderChange = (g: "male" | "female") => {
-    setGender(g);
-    localStorage.setItem("user_gender", g);
-  };
-
-  const roleTitle = gender === "female" ? "Мусульманка" : "Мусульманин";
+  // roleTitle: show saved name if set, otherwise default
+  const roleTitle = savedName.trim() ? savedName.trim() : "Мусульманин";
 
   const totalTasbih =
     tasbihCounters?.reduce((acc, c) => acc + Number(c.count), 0) ?? 0;
+
+  const handleStartEditing = () => {
+    setNameEdit(savedName);
+    setIsEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
 
   const handleSaveName = async () => {
     if (!nameEdit.trim()) return;
     setIsSavingName(true);
     try {
       await saveProfile({ name: nameEdit.trim() });
+      localStorage.setItem("user_display_name", nameEdit.trim());
+      setSavedName(nameEdit.trim());
+      setIsEditingName(false);
       toast.success("Имя сохранено");
     } catch {
       toast.error("Ошибка при сохранении");
     } finally {
       setIsSavingName(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    setNameEdit(savedName);
+    setIsEditingName(false);
   };
 
   const handleSignOut = async () => {
@@ -1028,11 +981,57 @@ function ProfileScreen() {
             <AvatarCircle name={displayName} email={displayEmail} size="lg" />
           </div>
 
-          {/* Role title */}
-          <div className="text-center space-y-1.5">
-            <h2 className="text-2xl font-display font-bold text-gradient-orange">
-              {roleTitle}
-            </h2>
+          {/* Role title — click to edit */}
+          <div className="text-center space-y-1.5 w-full">
+            {isEditingName ? (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-2 justify-center"
+              >
+                <Input
+                  ref={nameInputRef}
+                  value={nameEdit}
+                  onChange={(e) => setNameEdit(e.target.value)}
+                  placeholder="Введите имя"
+                  className="bg-secondary/50 border-orange-500/30 focus:border-orange-500/60 text-sm h-9 max-w-[180px] text-center"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleSaveName();
+                    if (e.key === "Escape") handleCancelEdit();
+                  }}
+                  data-ocid="profile.name.input"
+                />
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-orange-400 h-9 px-3 text-xs font-semibold shrink-0"
+                  onClick={() => void handleSaveName()}
+                  disabled={isSavingName || !nameEdit.trim()}
+                  data-ocid="profile.name.save_button"
+                >
+                  {isSavingName ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    "Сохранить"
+                  )}
+                </Button>
+              </motion.div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEditing}
+                className="group flex items-center justify-center gap-2 mx-auto"
+                title="Нажмите, чтобы изменить имя"
+                data-ocid="profile.name.edit_button"
+              >
+                <h2 className="text-2xl font-display font-bold text-gradient-orange group-hover:opacity-80 transition-opacity">
+                  {roleTitle}
+                </h2>
+                <Pencil
+                  size={14}
+                  className="text-orange-400/50 group-hover:text-orange-400 transition-colors mt-0.5"
+                />
+              </button>
+            )}
             <div className="flex items-center justify-center gap-1.5">
               <Moon size={13} className="text-orange-400/70" />
               <span className="text-xs text-muted-foreground">
@@ -1047,155 +1046,25 @@ function ProfileScreen() {
               بارك الله فيك
             </div>
           </div>
-
-          {/* Gender toggle */}
-          <div className="flex gap-2 mt-1">
-            <button
-              type="button"
-              onClick={() => handleGenderChange("male")}
-              data-ocid="profile.gender.male.toggle"
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
-                gender === "male"
-                  ? "bg-orange-500 border-orange-500 text-black"
-                  : "bg-transparent border-orange-500/30 text-foreground/50 hover:border-orange-500/50"
-              }`}
-            >
-              Мусульманин
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGenderChange("female")}
-              data-ocid="profile.gender.female.toggle"
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
-                gender === "female"
-                  ? "bg-orange-500 border-orange-500 text-black"
-                  : "bg-transparent border-orange-500/30 text-foreground/50 hover:border-orange-500/50"
-              }`}
-            >
-              Мусульманка
-            </button>
-          </div>
-        </div>
-
-        {/* Name edit */}
-        <div className="mt-5 space-y-2 relative">
-          <label
-            htmlFor="profile-name"
-            className="text-xs text-muted-foreground font-medium"
-          >
-            Ваше имя
-          </label>
-          <div className="flex gap-2">
-            <Input
-              id="profile-name"
-              value={nameEdit}
-              onChange={(e) => setNameEdit(e.target.value)}
-              placeholder="Введите имя"
-              className="bg-secondary/50 border-orange-500/20 focus:border-orange-500/50 text-sm h-9 flex-1"
-              data-ocid="profile.name.input"
-            />
-            <Button
-              size="sm"
-              className="bg-primary text-primary-foreground hover:bg-orange-400 h-9 px-3 text-xs font-semibold shrink-0"
-              onClick={() => void handleSaveName()}
-              disabled={isSavingName || !nameEdit.trim()}
-              data-ocid="profile.name.save_button"
-            >
-              {isSavingName ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                "Сохранить"
-              )}
-            </Button>
-          </div>
         </div>
       </div>
-
-      {/* ── Achievements Section ── */}
-      <AchievementsSection />
 
       {/* ── Notifications Section ── */}
       <NotificationSection />
 
-      {/* ── Stats Section ── */}
-      <div className="glass-card rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-base">📿</span>
-          <span className="text-sm font-bold text-foreground">
-            Тасбих сегодня
-          </span>
-          <span className="ml-auto text-orange-400 font-bold text-lg leading-none">
-            {totalTasbih}
-          </span>
-        </div>
-
-        {tasbihCounters && tasbihCounters.length > 0 && (
-          <>
-            <Separator className="bg-orange-500/10" />
-            <div className="space-y-2">
-              {tasbihCounters.map((counter) => {
-                const pct = Math.min(
-                  (Number(counter.count) / Number(counter.target)) * 100,
-                  100,
-                );
-                return (
-                  <div key={counter.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        {counter.name}
-                      </span>
-                      <span className="text-foreground font-medium">
-                        {Number(counter.count)} / {Number(counter.target)}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-foreground/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500/70 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+      {/* ── 2-column grid: Namaz + Tasbih ── */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Today's Namaz */}
+        <TodayNamazSection />
+        {/* Tasbih */}
+        <TasbihStatsCard
+          totalTasbih={totalTasbih}
+          tasbihCounters={tasbihCounters}
+        />
       </div>
 
-      {/* ── Prayer Settings ── */}
-      <div className="glass-card rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <BookOpen size={15} className="text-orange-400" />
-          <span className="text-sm font-bold text-foreground">
-            Настройки намаза
-          </span>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Метод расчёта</span>
-            <span className="text-foreground font-medium truncate max-w-[150px] text-right">
-              {prayerSettings?.calculationMethod || "Не задан"}
-            </span>
-          </div>
-          <Separator className="bg-orange-500/10" />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Мазхаб</span>
-            <span className="text-foreground font-medium">
-              {prayerSettings?.madhab || "Не задан"}
-            </span>
-          </div>
-          <Separator className="bg-orange-500/10" />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground flex items-center gap-1">
-              <Globe size={12} />
-              Местоположение
-            </span>
-            <span className="text-foreground font-medium truncate max-w-[160px] text-right">
-              {prayerSettings?.locationName || "Не задано"}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* ── Quran Stats — full width ── */}
+      <QuranStatsSection />
 
       {/* ── Sign out ── */}
       <Button
@@ -1215,7 +1084,6 @@ function ProfileScreen() {
 
 // ─── Admin (Author) Profile Screen ────────────────────────────────────────────
 function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
-  const { data: prayerSettings } = useGetPrayerSettings();
   const { data: tasbihCounters } = useGetTasbihCounters();
   const totalTasbih =
     tasbihCounters?.reduce((acc, c) => acc + Number(c.count), 0) ?? 0;
@@ -1283,91 +1151,20 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
         </div>
       </div>
 
-      {/* ── Admin Achievements ── */}
-      <AchievementsSection />
-
       {/* ── Notifications Section ── */}
       <NotificationSection />
 
-      {/* ── Admin Stats ── */}
-      <div className="glass-card rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-base">📿</span>
-          <span className="text-sm font-bold text-foreground">
-            Тасбих сегодня
-          </span>
-          <span className="ml-auto text-orange-400 font-bold text-lg leading-none">
-            {totalTasbih}
-          </span>
-        </div>
-
-        {tasbihCounters && tasbihCounters.length > 0 && (
-          <>
-            <Separator className="bg-orange-500/10" />
-            <div className="space-y-2">
-              {tasbihCounters.map((counter) => {
-                const pct = Math.min(
-                  (Number(counter.count) / Number(counter.target)) * 100,
-                  100,
-                );
-                return (
-                  <div key={counter.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        {counter.name}
-                      </span>
-                      <span className="text-foreground font-medium">
-                        {Number(counter.count)} / {Number(counter.target)}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-foreground/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500/70 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+      {/* ── 2-column grid: Namaz + Tasbih ── */}
+      <div className="grid grid-cols-2 gap-3">
+        <TodayNamazSection />
+        <TasbihStatsCard
+          totalTasbih={totalTasbih}
+          tasbihCounters={tasbihCounters}
+        />
       </div>
 
-      {/* ── Prayer Settings ── */}
-      <div className="glass-card rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <BookOpen size={15} className="text-orange-400" />
-          <span className="text-sm font-bold text-foreground">
-            Настройки намаза
-          </span>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Метод расчёта</span>
-            <span className="text-foreground font-medium truncate max-w-[150px] text-right">
-              {prayerSettings?.calculationMethod || "Не задан"}
-            </span>
-          </div>
-          <Separator className="bg-orange-500/10" />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Мазхаб</span>
-            <span className="text-foreground font-medium">
-              {prayerSettings?.madhab || "Не задан"}
-            </span>
-          </div>
-          <Separator className="bg-orange-500/10" />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground flex items-center gap-1">
-              <Globe size={12} />
-              Местоположение
-            </span>
-            <span className="text-foreground font-medium truncate max-w-[160px] text-right">
-              {prayerSettings?.locationName || "Не задано"}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* ── Quran Stats ── */}
+      <QuranStatsSection />
 
       {/* ── Sign out ── */}
       <Button

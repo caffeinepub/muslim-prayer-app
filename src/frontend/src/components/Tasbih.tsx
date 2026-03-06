@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Check, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddTasbihCounter,
@@ -263,7 +264,9 @@ export default function TasbihTab() {
   const [newTarget, setNewTarget] = useState("33");
 
   const { identity } = useInternetIdentity();
-  const isLoggedIn = !!identity;
+  const { user: firebaseUser } = useFirebaseAuth();
+  const isAuthorLoggedIn = sessionStorage.getItem("author_session") === "1";
+  const isLoggedIn = !!identity || !!firebaseUser || isAuthorLoggedIn;
 
   const { data: backendCounters } = useGetTasbihCounters();
   const { mutate: addCounter } = useAddTasbihCounter();
@@ -450,7 +453,15 @@ export default function TasbihTab() {
       </div>
 
       {/* Sync notice */}
-      {!isLoggedIn && (
+      {isLoggedIn ? (
+        <div className="glass-card rounded-xl p-3 mb-4 border border-green-500/20 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+          <p className="text-xs text-foreground/60">
+            Вход завершён — синхронизация счётчиков и сохранение идёт в ваш
+            профиль
+          </p>
+        </div>
+      ) : (
         <div className="glass-card rounded-xl p-3 mb-4 border border-orange-500/20 flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
           <p className="text-xs text-foreground/50">
@@ -503,13 +514,23 @@ export default function TasbihTab() {
       </div>
 
       {/* Quick dhikr reminder */}
-      <div className="mt-6 glass-card rounded-xl p-4 border border-orange-500/10">
+      <div className="mt-6 glass-card rounded-xl p-4 border border-orange-500/10 space-y-2">
+        <div
+          className="text-center text-base text-orange-400/60 leading-relaxed"
+          style={{ fontFamily: "serif", direction: "rtl" }}
+        >
+          سُبْحَانَ اللهِ · الحَمْدُ لِلهِ · اللهُ أَكْبَرُ
+        </div>
         <p className="text-center text-foreground/40 text-xs leading-relaxed">
           «Тот, кто произносит{" "}
           <span className="text-orange-400">Субханаллах</span> 33 раза,{" "}
           <span className="text-orange-400">Альхамдулиллах</span> 33 раза и{" "}
           <span className="text-orange-400">Аллаху Акбар</span> 34 раза после
-          намаза...»
+          намаза, — тому простятся грехи, даже если их столько, сколько морской
+          пены.»
+        </p>
+        <p className="text-center text-foreground/25 text-[10px]">
+          (Муслим, 597)
         </p>
       </div>
     </div>

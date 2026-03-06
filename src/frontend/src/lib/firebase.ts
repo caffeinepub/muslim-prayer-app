@@ -1,12 +1,11 @@
 import { initializeApp } from "firebase/app";
 import {
+  GoogleAuthProvider,
   type User,
   signOut as firebaseSignOut,
   getAuth,
-  isSignInWithEmailLink,
   onAuthStateChanged,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
+  signInWithPopup,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -22,20 +21,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-export const CONTINUE_URL = "https://draft.caffeine.xyz";
-export const EMAIL_KEY = "firebaseEmailForSignIn";
-
-export const actionCodeSettings = {
-  url: CONTINUE_URL,
-  handleCodeInApp: true,
-};
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export {
-  isSignInWithEmailLink,
-  sendSignInLinkToEmail,
-  signInWithEmailLink,
+  GoogleAuthProvider,
   onAuthStateChanged,
   firebaseSignOut,
+  signInWithPopup,
 };
 
 export type { User };

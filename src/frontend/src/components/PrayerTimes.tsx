@@ -25,7 +25,9 @@ import {
   PrayerTimes,
 } from "adhan";
 import {
+  CheckCircle2,
   ChevronDown,
+  Circle,
   Clock,
   Locate,
   MapPin,
@@ -137,6 +139,42 @@ function saveStoredLocation(lat: number, lng: number, name: string) {
   }
 }
 
+// ─── Prayer Tracking helpers ─────────────────────────────────────────────────
+const PRAYER_TRACK_KEY = "prayer_completed_today";
+
+function getTodayKey(): string {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function loadPrayersDone(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PRAYER_TRACK_KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as { date: string; keys: string[] };
+      if (data.date === getTodayKey()) {
+        return new Set(data.keys);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return new Set();
+}
+
+function savePrayersDone(done: Set<string>) {
+  try {
+    localStorage.setItem(
+      PRAYER_TRACK_KEY,
+      JSON.stringify({ date: getTodayKey(), keys: Array.from(done) }),
+    );
+    // Also update total prayers count in achievements
+    const total = Number(localStorage.getItem("prayers_checked") || "0");
+    localStorage.setItem("prayers_checked", String(total + 1));
+  } catch {
+    // ignore
+  }
+}
+
 export default function PrayerTimesTab() {
   // Initialize coords directly from localStorage so they never flash empty
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
@@ -164,6 +202,8 @@ export default function PrayerTimesTab() {
   const [isSearching, setIsSearching] = useState(false);
   // Track whether we've applied localStorage data to avoid re-showing prompt
   const localStorageApplied = useRef(readStoredLocation() !== null);
+  // Prayer completion tracking
+  const [prayersDone, setPrayersDone] = useState<Set<string>>(loadPrayersDone);
 
   const { identity } = useInternetIdentity();
   const isLoggedIn = !!identity;
@@ -422,6 +462,38 @@ export default function PrayerTimesTab() {
   const { current, next, nextTime } = getActivePrayer();
   const countdown = nextTime ? nextTime.getTime() - now.getTime() : 0;
 
+  const handleTogglePrayer = (key: string) => {
+    // Only allow marking actual prayers (not sunrise)
+    if (key === "sunrise") return;
+    setPrayersDone((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        // Decrement total when unmarking
+        const total = Math.max(
+          0,
+          Number(localStorage.getItem("prayers_checked") || "0") - 1,
+        );
+        localStorage.setItem("prayers_checked", String(total));
+        try {
+          localStorage.setItem(
+            PRAYER_TRACK_KEY,
+            JSON.stringify({ date: getTodayKey(), keys: Array.from(next) }),
+          );
+        } catch {
+          /* ignore */
+        }
+      } else {
+        next.add(key);
+        savePrayersDone(next);
+        toast.success(
+          `${key === "fajr" ? "Фаджр" : key === "dhuhr" ? "Зухр" : key === "asr" ? "Аср" : key === "maghrib" ? "Магриб" : "Иша"} совершён! 🤲`,
+        );
+      }
+      return next;
+    });
+  };
+
   const todayHijri = toHijri(now);
 
   const prayerIcons: Record<string, string> = {
@@ -674,25 +746,44 @@ export default function PrayerTimesTab() {
               <Skeleton key={k} className="h-16 rounded-xl bg-secondary" />
             ))
           : prayers.map((prayer) => {
-              const isActive =
-                current?.key === prayer.key || next?.key === prayer.key;
+              const isNext =
+                next?.key === prayer.key && !prayersDone.has(prayer.key);
+              const isCurrent = current?.key === prayer.key;
               const isPast = prayer.time ? prayer.time < now : false;
               const isSunrise = prayer.key === "sunrise";
+              const isDone = prayersDone.has(prayer.key);
 
               return (
                 <div
                   key={prayer.key}
                   className={`glass-card rounded-xl px-4 py-3 flex items-center justify-between transition-all duration-300 ${
-                    isActive && !isSunrise ? "prayer-active" : ""
-                  } ${isPast && !isActive ? "opacity-50" : ""}`}
+                    isNext && !isSunrise
+                      ? "bg-orange-500/10 border border-orange-500/35"
+                      : isDone
+                        ? "border-green-500/30"
+                        : isCurrent && !isSunrise
+                          ? "border-white/10"
+                          : ""
+                  } ${isPast && !isCurrent && !isNext && !isDone ? "opacity-50" : ""}`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{prayerIcons[prayer.key]}</span>
                     <div>
                       <div
-                        className={`font-semibold text-sm ${isActive && !isSunrise ? "text-orange-400" : "text-foreground"}`}
+                        className={`font-semibold text-sm ${
+                          isDone
+                            ? "text-green-400"
+                            : isNext && !isSunrise
+                              ? "text-orange-400 font-bold"
+                              : "text-foreground"
+                        }`}
                       >
                         {prayer.nameRu}
+                        {isDone && (
+                          <span className="ml-1 text-xs font-normal text-green-400/70">
+                            совершён
+                          </span>
+                        )}
                       </div>
                       <div
                         className="text-foreground/40 text-xs"
@@ -702,12 +793,43 @@ export default function PrayerTimesTab() {
                       </div>
                     </div>
                   </div>
-                  <div
-                    className={`font-mono text-lg font-bold ${isActive && !isSunrise ? "text-orange-400" : "text-foreground/80"}`}
-                  >
-                    {formatTime(prayer.time)}
-                    {isActive && !isSunrise && (
-                      <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`font-mono text-lg font-bold ${
+                        isDone
+                          ? "text-green-400"
+                          : isNext && !isSunrise
+                            ? "text-orange-400 font-bold"
+                            : "text-foreground/80"
+                      }`}
+                    >
+                      {formatTime(prayer.time)}
+                      {isNext && !isSunrise && (
+                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                      )}
+                    </div>
+                    {/* Checkbox — only for the 5 prayers */}
+                    {!isSunrise && (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePrayer(prayer.key)}
+                        className="transition-all duration-200 hover:scale-110 active:scale-95"
+                        title={
+                          isDone
+                            ? "Отметить как не совершённый"
+                            : "Отметить как совершённый"
+                        }
+                        data-ocid={`prayer.done.${prayer.key}.toggle`}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={22} className="text-green-400" />
+                        ) : (
+                          <Circle
+                            size={22}
+                            className="text-foreground/20 hover:text-orange-400/60"
+                          />
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
