@@ -20,17 +20,38 @@ export default {
         display: ["Bricolage Grotesque", "sans-serif"],
       },
       colors: {
+        // Islamic green (emerald) scale — replaces orange
+        islamic: {
+          50: "oklch(var(--islamic-50))",
+          100: "oklch(var(--islamic-100))",
+          200: "oklch(var(--islamic-200))",
+          300: "oklch(var(--islamic-300))",
+          400: "oklch(var(--islamic-400))",
+          500: "oklch(var(--islamic-500))",
+          600: "oklch(var(--islamic-600))",
+          700: "oklch(var(--islamic-700))",
+          800: "oklch(var(--islamic-800))",
+          900: "oklch(var(--islamic-900))",
+        },
+        // Gold accent scale
+        gold: {
+          300: "oklch(var(--gold-300))",
+          400: "oklch(var(--gold-400))",
+          500: "oklch(var(--gold-500))",
+          600: "oklch(var(--gold-600))",
+        },
+        // Keep orange alias pointing to islamic for backward compat in older refs
         orange: {
-          50: "oklch(var(--orange-50))",
-          100: "oklch(var(--orange-100))",
-          200: "oklch(var(--orange-200))",
-          300: "oklch(var(--orange-300))",
-          400: "oklch(var(--orange-400))",
-          500: "oklch(var(--orange-500))",
-          600: "oklch(var(--orange-600))",
-          700: "oklch(var(--orange-700))",
-          800: "oklch(var(--orange-800))",
-          900: "oklch(var(--orange-900))",
+          50: "oklch(var(--islamic-50))",
+          100: "oklch(var(--islamic-100))",
+          200: "oklch(var(--islamic-200))",
+          300: "oklch(var(--islamic-300))",
+          400: "oklch(var(--islamic-400))",
+          500: "oklch(var(--islamic-500))",
+          600: "oklch(var(--islamic-600))",
+          700: "oklch(var(--islamic-700))",
+          800: "oklch(var(--islamic-800))",
+          900: "oklch(var(--islamic-900))",
         },
         border: "oklch(var(--border))",
         input: "oklch(var(--input))",
@@ -90,8 +111,12 @@ export default {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
-        orange: "0 0 20px oklch(var(--orange-500) / 0.2)",
-        "orange-lg": "0 0 40px oklch(var(--orange-500) / 0.25)",
+        islamic: "0 0 20px oklch(var(--islamic-500) / 0.2)",
+        "islamic-lg": "0 0 40px oklch(var(--islamic-500) / 0.25)",
+        gold: "0 0 20px oklch(var(--gold-500) / 0.2)",
+        // keep old names mapped to new
+        orange: "0 0 20px oklch(var(--islamic-500) / 0.2)",
+        "orange-lg": "0 0 40px oklch(var(--islamic-500) / 0.25)",
       },
       keyframes: {
         "accordion-down": {
@@ -106,15 +131,21 @@ export default {
           from: { transform: "rotate(0deg)" },
           to: { transform: "rotate(360deg)" },
         },
+        "pulse-green": {
+          "0%, 100%": { boxShadow: "0 0 0 0 oklch(var(--islamic-500) / 0.3)" },
+          "50%": { boxShadow: "0 0 0 8px oklch(var(--islamic-500) / 0)" },
+        },
+        // keep old name mapped
         "pulse-orange": {
-          "0%, 100%": { boxShadow: "0 0 0 0 oklch(var(--orange-500) / 0.3)" },
-          "50%": { boxShadow: "0 0 0 8px oklch(var(--orange-500) / 0)" },
+          "0%, 100%": { boxShadow: "0 0 0 0 oklch(var(--islamic-500) / 0.3)" },
+          "50%": { boxShadow: "0 0 0 8px oklch(var(--islamic-500) / 0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "spin-slow": "spin-slow 8s linear infinite",
+        "pulse-green": "pulse-green 2s ease-in-out infinite",
         "pulse-orange": "pulse-orange 2s ease-in-out infinite",
       },
     },

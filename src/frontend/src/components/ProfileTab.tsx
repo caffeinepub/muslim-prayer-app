@@ -310,14 +310,14 @@ function NotificationSection() {
       {/* ── Header row — always visible ── */}
       <button
         type="button"
-        className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-orange-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+        className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left transition-colors hover:bg-islamic-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/40"
         onClick={() => permission === "granted" && setIsOpen((v) => !v)}
         data-ocid="profile.notifications.settings.toggle"
         aria-expanded={isOpen}
       >
         {/* Bell icon */}
-        <div className="w-7 h-7 rounded-lg bg-orange-500/15 flex items-center justify-center shrink-0">
-          <Bell size={14} className="text-orange-400" />
+        <div className="w-7 h-7 rounded-lg bg-islamic-500/15 flex items-center justify-center shrink-0">
+          <Bell size={14} className="text-islamic-400" />
         </div>
 
         {/* Label */}
@@ -343,7 +343,7 @@ function NotificationSection() {
         ) : (
           <button
             type="button"
-            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-orange-500 text-black hover:bg-orange-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-islamic-500 text-black hover:bg-islamic-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/50"
             onClick={(e) => {
               e.stopPropagation();
               void handleEnableNotifications();
@@ -407,7 +407,7 @@ function NotificationSection() {
                     checked={settings[row.key]}
                     onCheckedChange={(val) => handleToggle(row.key, val)}
                     data-ocid={row.ocid}
-                    className="data-[state=checked]:bg-orange-500"
+                    className="data-[state=checked]:bg-islamic-500"
                   />
                 </motion.div>
               ))}
@@ -451,7 +451,7 @@ function AvatarCircle({
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center font-display font-bold text-black shadow-lg shadow-orange-500/25 border-2 border-orange-500/40 flex-shrink-0`}
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-islamic-500 to-islamic-700 flex items-center justify-center font-display font-bold text-black shadow-lg shadow-islamic-500/25 border-2 border-islamic-500/40 flex-shrink-0`}
     >
       {initials}
     </div>
@@ -538,7 +538,7 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
       {/* Arabic calligraphy header */}
       <div className="text-center space-y-2">
         <div
-          className="text-4xl leading-relaxed text-orange-400 drop-shadow-lg"
+          className="text-4xl leading-relaxed text-islamic-400 drop-shadow-lg"
           style={{ fontFamily: "serif", direction: "rtl" }}
         >
           بِسْمِ اللَّهِ
@@ -586,9 +586,9 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
         </motion.div>
 
         {/* Author login */}
-        <div className="glass-card rounded-2xl p-5 space-y-3 border border-orange-500/10">
+        <div className="glass-card rounded-2xl p-5 space-y-3 border border-islamic-500/10">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-orange-400" />
+            <ShieldCheck size={16} className="text-islamic-400" />
             <span className="text-sm font-semibold text-foreground">
               Вход автора
             </span>
@@ -610,7 +610,7 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
               className={`bg-secondary/50 h-10 ${
                 authorError
                   ? "border-red-500/60 focus:border-red-500"
-                  : "border-orange-500/20 focus:border-orange-500/50"
+                  : "border-islamic-500/20 focus:border-islamic-500/50"
               }`}
               data-ocid="profile.author.input"
               autoComplete="off"
@@ -619,7 +619,7 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
               <p className="text-xs text-red-400">Неверный пароль</p>
             )}
             <Button
-              className="w-full bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 font-semibold h-10"
+              className="w-full bg-islamic-500/10 border border-islamic-500/30 text-islamic-400 hover:bg-islamic-500/20 font-semibold h-10"
               variant="outline"
               onClick={handleAuthorLogin}
               disabled={!authorPassword.trim()}
@@ -649,11 +649,11 @@ function TodayNamazSection() {
   return (
     <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
       <div className="flex items-center gap-1.5">
-        <div className="w-5 h-5 rounded-md bg-orange-500/15 flex items-center justify-center">
-          <Sun size={12} className="text-orange-400" />
+        <div className="w-5 h-5 rounded-md bg-islamic-500/15 flex items-center justify-center">
+          <Sun size={12} className="text-islamic-400" />
         </div>
         <span className="text-xs font-bold text-foreground">Намаз</span>
-        <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
+        <span className="ml-auto text-islamic-400 font-bold text-sm leading-none">
           {count}/5
         </span>
       </div>
@@ -683,7 +683,7 @@ function TodayNamazSection() {
               stroke="currentColor"
               strokeWidth="5"
               strokeLinecap="round"
-              className="text-orange-500"
+              className="text-islamic-500"
               strokeDasharray={`${2 * Math.PI * 26}`}
               initial={{ strokeDashoffset: 2 * Math.PI * 26 }}
               animate={{
@@ -748,11 +748,11 @@ function TasbihStatsCard({
   return (
     <div className="glass-card rounded-2xl p-4 space-y-3 flex flex-col">
       <div className="flex items-center gap-1.5">
-        <div className="w-5 h-5 rounded-md bg-orange-500/15 flex items-center justify-center">
-          <Wind size={12} className="text-orange-400" />
+        <div className="w-5 h-5 rounded-md bg-islamic-500/15 flex items-center justify-center">
+          <Wind size={12} className="text-islamic-400" />
         </div>
         <span className="text-xs font-bold text-foreground">Тасбих</span>
-        <span className="ml-auto text-orange-400 font-bold text-sm leading-none">
+        <span className="ml-auto text-islamic-400 font-bold text-sm leading-none">
           {totalTasbih}
         </span>
       </div>
@@ -764,7 +764,7 @@ function TasbihStatsCard({
             initial={{ scale: 1.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="text-3xl font-display font-bold text-orange-400"
+            className="text-3xl font-display font-bold text-islamic-400"
           >
             {totalTasbih}
           </motion.div>
@@ -785,13 +785,13 @@ function TasbihStatsCard({
                   <span className="text-muted-foreground truncate max-w-[80px]">
                     {counter.name}
                   </span>
-                  <span className="text-orange-400/70 font-medium shrink-0 ml-1">
+                  <span className="text-islamic-400/70 font-medium shrink-0 ml-1">
                     {Number(counter.count)}/{Number(counter.target)}
                   </span>
                 </div>
                 <div className="h-1 bg-foreground/10 rounded-full overflow-hidden">
                   <motion.div
-                    className="h-full bg-orange-500/70 rounded-full"
+                    className="h-full bg-islamic-500/70 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
@@ -877,7 +877,7 @@ function ProfileScreen() {
         className="flex items-center justify-center h-60"
         data-ocid="profile.loading_state"
       >
-        <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-islamic-400 animate-spin" />
       </div>
     );
   }
@@ -906,14 +906,14 @@ function ProfileScreen() {
               "radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.55 0.18 45 / 0.12) 0%, transparent 70%)",
           }}
         />
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-orange-500/5 blur-2xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-islamic-500/5 blur-2xl pointer-events-none" />
 
         {/* Avatar + info */}
         <div className="flex flex-col items-center gap-4 relative">
           {/* Pulse ring behind avatar */}
           <div className="relative flex items-center justify-center">
             <motion.div
-              className="absolute w-28 h-28 rounded-full border border-orange-500/20"
+              className="absolute w-28 h-28 rounded-full border border-islamic-500/20"
               animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0, 0.4] }}
               transition={{
                 duration: 2.5,
@@ -922,7 +922,7 @@ function ProfileScreen() {
               }}
             />
             <motion.div
-              className="absolute w-24 h-24 rounded-full border border-orange-500/15"
+              className="absolute w-24 h-24 rounded-full border border-islamic-500/15"
               animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0, 0.3] }}
               transition={{
                 duration: 2.5,
@@ -947,7 +947,7 @@ function ProfileScreen() {
                   value={nameEdit}
                   onChange={(e) => setNameEdit(e.target.value)}
                   placeholder="Введите имя"
-                  className="bg-secondary/50 border-orange-500/30 focus:border-orange-500/60 text-sm h-9 max-w-[180px] text-center"
+                  className="bg-secondary/50 border-islamic-500/30 focus:border-islamic-500/60 text-sm h-9 max-w-[180px] text-center"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void handleSaveName();
                     if (e.key === "Escape") handleCancelEdit();
@@ -956,7 +956,7 @@ function ProfileScreen() {
                 />
                 <Button
                   size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-orange-400 h-9 px-3 text-xs font-semibold shrink-0"
+                  className="bg-primary text-primary-foreground hover:bg-islamic-400 h-9 px-3 text-xs font-semibold shrink-0"
                   onClick={() => void handleSaveName()}
                   disabled={isSavingName || !nameEdit.trim()}
                   data-ocid="profile.name.save_button"
@@ -981,19 +981,19 @@ function ProfileScreen() {
                 </h2>
                 <Pencil
                   size={14}
-                  className="text-orange-400/50 group-hover:text-orange-400 transition-colors mt-0.5"
+                  className="text-islamic-400/50 group-hover:text-islamic-400 transition-colors mt-0.5"
                 />
               </button>
             )}
             <div className="flex items-center justify-center gap-1.5">
-              <Moon size={13} className="text-orange-400/70" />
+              <Moon size={13} className="text-islamic-400/70" />
               <span className="text-xs text-muted-foreground">
                 {displayEmail}
               </span>
             </div>
             {/* Arabic phrase */}
             <div
-              className="text-sm text-orange-400/50 leading-relaxed"
+              className="text-sm text-islamic-400/50 leading-relaxed"
               style={{ fontFamily: "serif", direction: "rtl" }}
             >
               بارك الله فيك
@@ -1082,7 +1082,7 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
                 ease: "linear",
               }}
             />
-            <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center font-display font-bold text-black text-2xl shadow-2xl shadow-orange-500/40 border-2 border-orange-500/60 z-10">
+            <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-islamic-500 to-islamic-700 flex items-center justify-center font-display font-bold text-black text-2xl shadow-2xl shadow-islamic-500/40 border-2 border-islamic-500/60 z-10">
               АД
             </div>
           </div>
@@ -1092,15 +1092,15 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
             <h2 className="text-2xl font-display font-bold text-gradient-orange">
               Администратор
             </h2>
-            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-orange-500/15 border border-orange-500/30 rounded-full mx-auto w-fit">
-              <Star size={12} className="text-orange-400 fill-orange-400" />
-              <span className="text-xs text-orange-400 font-semibold">
+            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-islamic-500/15 border border-islamic-500/30 rounded-full mx-auto w-fit">
+              <Star size={12} className="text-islamic-400 fill-islamic-400" />
+              <span className="text-xs text-islamic-400 font-semibold">
                 Автор приложения
               </span>
-              <Star size={12} className="text-orange-400 fill-orange-400" />
+              <Star size={12} className="text-islamic-400 fill-islamic-400" />
             </div>
             <div
-              className="text-sm text-orange-400/50 leading-relaxed"
+              className="text-sm text-islamic-400/50 leading-relaxed"
               style={{ fontFamily: "serif", direction: "rtl" }}
             >
               الحمد لله
@@ -1147,7 +1147,7 @@ function PrayerGuideCard({ onOpen }: { onOpen: () => void }) {
       type="button"
       onClick={onOpen}
       whileTap={{ scale: 0.97 }}
-      className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+      className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/50"
       style={{
         background:
           "linear-gradient(135deg, oklch(0.14 0.025 45) 0%, oklch(0.18 0.04 45) 60%, oklch(0.22 0.06 45) 100%)",
@@ -1236,7 +1236,7 @@ function PrayerGuideCard({ onOpen }: { onOpen: () => void }) {
         </div>
 
         {/* Arrow */}
-        <BookOpen size={18} className="text-orange-400/50 shrink-0" />
+        <BookOpen size={18} className="text-islamic-400/50 shrink-0" />
       </div>
     </motion.button>
   );

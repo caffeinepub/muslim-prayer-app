@@ -464,11 +464,11 @@ export default function QuranTab() {
       {/* Header */}
       <div className="text-center mb-5">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <BookOpen size={16} className="text-orange-500" />
+          <BookOpen size={16} className="text-islamic-500" />
           <h2 className="text-xl font-display font-bold text-gradient-orange">
             Священный Коран
           </h2>
-          <BookOpen size={16} className="text-orange-500" />
+          <BookOpen size={16} className="text-islamic-500" />
         </div>
         <p className="text-foreground/40 text-xs">
           114 сур — на арабском и по-русски
@@ -516,13 +516,13 @@ export default function QuranTab() {
             <button
               type="button"
               key={surah.number}
-              className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3 hover:border-orange-500/30 transition-all duration-200 text-left group"
+              className="w-full glass-card rounded-xl px-4 py-3 flex items-center gap-3 hover:border-islamic-500/30 transition-all duration-200 text-left group"
               onClick={() => setSelectedSurah(surah)}
               data-ocid={`quran.surah.item.${surah.number}`}
             >
               {/* Number badge */}
-              <div className="w-9 h-9 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-orange-400">
+              <div className="w-9 h-9 rounded-lg bg-islamic-500/10 border border-islamic-500/20 flex items-center justify-center shrink-0">
+                <span className="text-xs font-bold text-islamic-400">
                   {surah.number}
                 </span>
               </div>
@@ -535,7 +535,7 @@ export default function QuranTab() {
                   </span>
                   <Badge
                     variant="outline"
-                    className="text-[9px] px-1 py-0 border-orange-500/20 text-orange-400/60 shrink-0"
+                    className="text-[9px] px-1 py-0 border-islamic-500/20 text-islamic-400/60 shrink-0"
                   >
                     {surah.place}
                   </Badge>
@@ -547,7 +547,7 @@ export default function QuranTab() {
 
               {/* Arabic name */}
               <div
-                className="text-lg font-bold text-foreground/70 group-hover:text-orange-400 transition-colors shrink-0"
+                className="text-lg font-bold text-foreground/70 group-hover:text-islamic-400 transition-colors shrink-0"
                 style={{ fontFamily: "serif", direction: "rtl" }}
               >
                 {surah.arabic}

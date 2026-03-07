@@ -23,11 +23,11 @@ export default function AsmaulHusna() {
       {/* Header */}
       <div className="text-center mb-5">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <Sparkles size={16} className="text-orange-500" />
+          <Sparkles size={16} className="text-islamic-500" />
           <h2 className="text-xl font-display font-bold text-gradient-orange">
             Асма уль-Хусна
           </h2>
-          <Sparkles size={16} className="text-orange-500" />
+          <Sparkles size={16} className="text-islamic-500" />
         </div>
         <p className="text-foreground/40 text-xs">99 прекрасных имён Аллаха</p>
         <div
@@ -72,12 +72,12 @@ export default function AsmaulHusna() {
           {filtered.map((name, idx) => (
             <div
               key={name.number}
-              className="glass-card rounded-xl p-3 text-center relative overflow-hidden group hover:border-orange-500/30 transition-all duration-200 cursor-default"
+              className="glass-card rounded-xl p-3 text-center relative overflow-hidden group hover:border-islamic-500/30 transition-all duration-200 cursor-default"
               style={{ animationDelay: `${(idx % 12) * 0.04}s` }}
             >
               {/* Number badge */}
-              <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-orange-500/15 flex items-center justify-center">
-                <span className="text-[9px] font-bold text-orange-500/70">
+              <div className="absolute top-2 left-2 w-5 h-5 rounded-full bg-islamic-500/15 flex items-center justify-center">
+                <span className="text-[9px] font-bold text-islamic-500/70">
                   {name.number}
                 </span>
               </div>
@@ -91,10 +91,10 @@ export default function AsmaulHusna() {
               </div>
 
               {/* Separator */}
-              <div className="w-8 h-px bg-orange-500/20 mx-auto mb-1.5" />
+              <div className="w-8 h-px bg-islamic-500/20 mx-auto mb-1.5" />
 
               {/* Transliteration */}
-              <div className="text-orange-400 text-xs font-medium mb-0.5 truncate">
+              <div className="text-islamic-400 text-xs font-medium mb-0.5 truncate">
                 {name.transliteration}
               </div>
 
@@ -104,7 +104,7 @@ export default function AsmaulHusna() {
               </div>
 
               {/* Hover glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/0 to-orange-500/0 group-hover:from-orange-500/5 group-hover:to-transparent transition-all duration-300 pointer-events-none rounded-xl" />
+              <div className="absolute inset-0 bg-gradient-to-br from-islamic-500/0 to-islamic-500/0 group-hover:from-islamic-500/5 group-hover:to-transparent transition-all duration-300 pointer-events-none rounded-xl" />
             </div>
           ))}
         </div>

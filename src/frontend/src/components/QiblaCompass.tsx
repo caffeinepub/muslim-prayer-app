@@ -492,13 +492,13 @@ export default function QiblaTab() {
         <AnimatePresence>
           {locationName && !isLoading && (
             <motion.div
-              className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20"
+              className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-islamic-500/10 border border-islamic-500/20"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
             >
-              <MapPin size={11} className="text-orange-400" />
-              <span className="text-xs text-orange-300 font-medium">
+              <MapPin size={11} className="text-islamic-400" />
+              <span className="text-xs text-islamic-300 font-medium">
                 {locationName}
               </span>
             </motion.div>
@@ -539,7 +539,7 @@ export default function QiblaTab() {
                 className={`absolute inset-4 rounded-full transition-all duration-500 ${
                   isAligned
                     ? "bg-green-500/20 shadow-[0_0_40px_12px_rgba(34,197,94,0.35)]"
-                    : "bg-orange-500/8 shadow-[0_0_30px_8px_rgba(249,115,22,0.18)]"
+                    : "bg-islamic-500/8 shadow-[0_0_30px_8px_rgba(249,115,22,0.18)]"
                 }`}
                 style={{ animation: "compassPulse 3s ease-in-out infinite" }}
               />
@@ -560,7 +560,7 @@ export default function QiblaTab() {
 
                 {/* Decorative inner circle */}
                 <div
-                  className="absolute rounded-full border border-orange-500/10"
+                  className="absolute rounded-full border border-islamic-500/10"
                   style={{
                     inset: "30px",
                     background: "rgba(0,0,0,0.2)",
@@ -612,7 +612,7 @@ export default function QiblaTab() {
                 transition={{ delay: 0.3 }}
               >
                 Направьте телефон на{" "}
-                <span className="text-orange-400 font-bold">С (север)</span> и
+                <span className="text-islamic-400 font-bold">С (север)</span> и
                 следуйте по стрелке
               </motion.p>
             )}
@@ -624,7 +624,7 @@ export default function QiblaTab() {
                 data-ocid="qibla.angle.card"
               >
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <Navigation size={12} className="text-orange-500" />
+                  <Navigation size={12} className="text-islamic-500" />
                 </div>
                 <div className="text-lg font-display font-bold text-foreground">
                   {Math.round(qiblaAngle)}°
@@ -639,7 +639,7 @@ export default function QiblaTab() {
                 data-ocid="qibla.distance.card"
               >
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  <MapPin size={12} className="text-orange-500" />
+                  <MapPin size={12} className="text-islamic-500" />
                 </div>
                 <div className="text-lg font-display font-bold text-foreground">
                   {distance ? `${Math.round(distance / 100) / 10}k` : "—"}
@@ -692,7 +692,7 @@ export default function QiblaTab() {
               Разрешите доступ в браузере или найдите город:
             </p>
             <Button
-              className="w-full mb-2 bg-orange-500/15 text-orange-300 border border-orange-500/30 hover:bg-orange-500/25 text-sm"
+              className="w-full mb-2 bg-islamic-500/15 text-islamic-300 border border-islamic-500/30 hover:bg-islamic-500/25 text-sm"
               variant="outline"
               onClick={requestLocation}
               data-ocid="qibla.geolocation.button"
@@ -718,7 +718,7 @@ export default function QiblaTab() {
           />
           <Button
             size="sm"
-            className="h-10 px-4 bg-primary text-primary-foreground hover:bg-orange-400 shrink-0"
+            className="h-10 px-4 bg-primary text-primary-foreground hover:bg-islamic-400 shrink-0"
             onClick={handleCitySearch}
             disabled={isSearching || !citySearch.trim()}
             data-ocid="qibla.city.submit_button"
@@ -735,7 +735,7 @@ export default function QiblaTab() {
         <Button
           variant="outline"
           size="sm"
-          className="w-full border-orange-500/25 text-orange-300 hover:bg-orange-500/10 text-xs"
+          className="w-full border-islamic-500/25 text-islamic-300 hover:bg-islamic-500/10 text-xs"
           onClick={requestLocation}
           data-ocid="qibla.retry.button"
         >

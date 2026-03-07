@@ -28,24 +28,24 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
       exit={{ opacity: 0, scale: 1.05 }}
       transition={{ duration: 0.6, ease: "easeInOut" }}
     >
-      {/* Radial glow */}
+      {/* Radial glow — emerald */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 60% 50% at 50% 50%, oklch(0.55 0.18 45 / 0.18) 0%, transparent 70%)",
+            "radial-gradient(ellipse 60% 50% at 50% 50%, oklch(0.68 0.18 155 / 0.18) 0%, transparent 70%)",
         }}
       />
 
       {/* Geometric ring */}
       <motion.div
-        className="absolute w-72 h-72 rounded-full border border-orange-500/15"
+        className="absolute w-72 h-72 rounded-full border border-islamic-500/15"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1.4, opacity: [0, 0.4, 0] }}
         transition={{ duration: 2.4, ease: "easeOut", delay: 0.3 }}
       />
       <motion.div
-        className="absolute w-56 h-56 rounded-full border border-orange-500/20"
+        className="absolute w-56 h-56 rounded-full border border-islamic-500/20"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1.2, opacity: [0, 0.5, 0] }}
         transition={{ duration: 2.2, ease: "easeOut", delay: 0.5 }}
@@ -63,11 +63,11 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
           <div
             className="absolute inset-0 rounded-3xl blur-2xl"
             style={{
-              background: "oklch(0.55 0.18 45 / 0.45)",
+              background: "oklch(0.68 0.18 155 / 0.45)",
               transform: "scale(1.4)",
             }}
           />
-          <div className="relative w-24 h-24 rounded-3xl overflow-hidden border-2 border-orange-500/30 shadow-2xl shadow-orange-500/20">
+          <div className="relative w-24 h-24 rounded-3xl overflow-hidden border-2 border-islamic-500/30 shadow-2xl shadow-islamic-500/20">
             <img
               src="/assets/generated/mosque-logo-transparent.dim_200x200.png"
               alt="Пятница!"
@@ -104,7 +104,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
           transition={{ delay: 0.9, duration: 0.6 }}
         >
           <div
-            className="text-2xl text-orange-400/80 drop-shadow-lg leading-relaxed"
+            className="text-2xl text-islamic-400/80 drop-shadow-lg leading-relaxed"
             style={{ fontFamily: "serif", direction: "rtl" }}
           >
             بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
@@ -125,7 +125,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         {[0, 1, 2].map((i) => (
           <motion.div
             key={i}
-            className="w-1.5 h-1.5 rounded-full bg-orange-500/50"
+            className="w-1.5 h-1.5 rounded-full bg-islamic-500/50"
             animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
             transition={{
               duration: 1.0,
@@ -343,14 +343,14 @@ export default function App() {
         className="sticky top-0 z-20 px-4 py-3 flex items-center justify-between"
         style={{
           background:
-            "linear-gradient(to bottom, oklch(0.1 0 0 / 0.97), oklch(0.1 0 0 / 0.8))",
+            "linear-gradient(to bottom, oklch(0.1 0.012 240 / 0.97), oklch(0.1 0.012 240 / 0.8))",
           backdropFilter: "blur(16px)",
-          borderBottom: "1px solid oklch(var(--orange-500) / 0.12)",
+          borderBottom: "1px solid oklch(var(--islamic-500) / 0.12)",
         }}
       >
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg overflow-hidden border border-orange-500/20">
+          <div className="w-8 h-8 rounded-lg overflow-hidden border border-islamic-500/20">
             <img
               src="/assets/generated/mosque-logo-transparent.dim_200x200.png"
               alt="Ислам"
@@ -374,7 +374,7 @@ export default function App() {
           // Clickable avatar → go to profile tab
           <button
             type="button"
-            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 rounded-full"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60 rounded-full"
             onClick={() => setActiveTab("profile")}
             title="Профиль"
             data-ocid="nav.profile.tab"
@@ -386,7 +386,7 @@ export default function App() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-foreground/50 hover:text-orange-400 hover:bg-orange-500/10"
+            className="h-8 w-8 text-foreground/50 hover:text-islamic-400 hover:bg-islamic-500/10"
             onClick={() => setActiveTab("profile")}
             title="Войти"
             data-ocid="auth.login.button"
@@ -433,15 +433,15 @@ export default function App() {
                   <div
                     className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 ${
                       isActive
-                        ? "bg-orange-500 text-white scale-105 shadow-orange-500/40"
-                        : "bg-orange-500/15 text-orange-400 border border-orange-500/30 hover:bg-orange-500/25"
+                        ? "bg-islamic-500 text-white scale-105 shadow-islamic-500/40"
+                        : "bg-islamic-500/15 text-islamic-400 border border-islamic-500/30 hover:bg-islamic-500/25"
                     }`}
                   >
                     {tab.icon}
                   </div>
                   <span
                     className={`text-[9px] font-medium transition-all duration-200 ${
-                      isActive ? "text-orange-400" : "text-foreground/30"
+                      isActive ? "text-islamic-400" : "text-foreground/30"
                     }`}
                   >
                     {tab.label}
@@ -470,7 +470,7 @@ export default function App() {
                       opacity: isActive ? 1 : 0,
                     }}
                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                    className="w-8 h-0.5 rounded-full bg-orange-500 origin-center"
+                    className="w-8 h-0.5 rounded-full bg-islamic-500 origin-center"
                   />
                 </div>
 
@@ -478,7 +478,7 @@ export default function App() {
                 <span
                   className={`transition-all duration-200 ${
                     isActive
-                      ? "text-orange-400 scale-110"
+                      ? "text-islamic-400 scale-110"
                       : "text-foreground/30"
                   }`}
                 >
@@ -488,7 +488,7 @@ export default function App() {
                 {/* Label */}
                 <span
                   className={`text-[10px] font-medium transition-all duration-200 ${
-                    isActive ? "text-orange-400" : "text-foreground/30"
+                    isActive ? "text-islamic-400" : "text-foreground/30"
                   }`}
                 >
                   {tab.label}
@@ -504,9 +504,9 @@ export default function App() {
         theme="dark"
         toastOptions={{
           style: {
-            background: "oklch(0.16 0.005 60)",
-            border: "1px solid oklch(var(--orange-500) / 0.2)",
-            color: "oklch(0.96 0.005 60)",
+            background: "oklch(0.16 0.014 240)",
+            border: "1px solid oklch(var(--islamic-500) / 0.2)",
+            color: "oklch(0.96 0.006 80)",
           },
         }}
       />

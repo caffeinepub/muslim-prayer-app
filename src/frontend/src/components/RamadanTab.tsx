@@ -254,11 +254,11 @@ export default function RamadanTab() {
       {/* Header */}
       <div className="text-center mb-5">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <Moon size={16} className="text-orange-500" />
+          <Moon size={16} className="text-islamic-500" />
           <h2 className="text-xl font-display font-bold text-gradient-orange">
             Рамадан
           </h2>
-          <Moon size={16} className="text-orange-500" />
+          <Moon size={16} className="text-islamic-500" />
         </div>
         <p className="text-foreground/40 text-xs">
           {ramadanInfo.day
@@ -276,7 +276,7 @@ export default function RamadanTab() {
       {/* Location */}
       <div className="glass-card rounded-2xl p-4 mb-4 space-y-3">
         <div className="flex items-center gap-1.5">
-          <MapPin size={13} className="text-orange-500 shrink-0" />
+          <MapPin size={13} className="text-islamic-500 shrink-0" />
           <span className="text-foreground/70 text-xs font-medium uppercase tracking-wider">
             Местоположение
           </span>
@@ -286,7 +286,7 @@ export default function RamadanTab() {
         >
           <MapPin
             size={12}
-            className={`shrink-0 ${locationError ? "text-red-400" : "text-orange-400"}`}
+            className={`shrink-0 ${locationError ? "text-red-400" : "text-islamic-400"}`}
           />
           <span className="text-foreground/80 text-xs truncate flex-1">
             {isLoadingLocation ? (
@@ -305,13 +305,13 @@ export default function RamadanTab() {
         <Button
           variant="outline"
           size="sm"
-          className="w-full h-9 text-xs border-orange-500/30 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 gap-2"
+          className="w-full h-9 text-xs border-islamic-500/30 bg-islamic-500/5 text-islamic-300 hover:bg-islamic-500/15 gap-2"
           onClick={requestLocation}
           disabled={isLoadingLocation}
           data-ocid="ramadan.location.button"
         >
           {isLoadingLocation ? (
-            <span className="w-3.5 h-3.5 border-2 border-orange-400/40 border-t-orange-400 rounded-full animate-spin" />
+            <span className="w-3.5 h-3.5 border-2 border-islamic-400/40 border-t-islamic-400 rounded-full animate-spin" />
           ) : (
             <Locate size={13} />
           )}
@@ -328,7 +328,7 @@ export default function RamadanTab() {
           />
           <Button
             size="sm"
-            className="h-9 px-3 bg-primary text-primary-foreground hover:bg-orange-400 shrink-0"
+            className="h-9 px-3 bg-primary text-primary-foreground hover:bg-islamic-400 shrink-0"
             onClick={handleCitySearch}
             disabled={isSearching || !citySearch.trim()}
             data-ocid="ramadan.location.submit_button"
@@ -344,17 +344,17 @@ export default function RamadanTab() {
 
       {/* Countdown to next event */}
       {!isLoadingLocation && prayerTimes && (
-        <div className="glass-card rounded-2xl p-4 mb-4 text-center border border-orange-500/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent" />
+        <div className="glass-card rounded-2xl p-4 mb-4 text-center border border-islamic-500/30 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-islamic-500/5 to-transparent" />
           <div className="relative">
             <div className="text-xs text-foreground/50 uppercase tracking-widest mb-1">
               До события
             </div>
-            <div className="text-xl font-display font-bold text-orange-400 mb-1">
+            <div className="text-xl font-display font-bold text-islamic-400 mb-1">
               {nextEvent.name}
             </div>
             <div className="flex items-center justify-center gap-2 mt-2">
-              <Clock size={14} className="text-orange-500" />
+              <Clock size={14} className="text-islamic-500" />
               <span className="font-mono text-3xl font-bold text-foreground tracking-wider">
                 {formatCountdown(countdown)}
               </span>
@@ -368,7 +368,7 @@ export default function RamadanTab() {
         {/* Suhoor */}
         <div className="glass-card rounded-2xl p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2">
-            <Star size={14} className="text-orange-400" />
+            <Star size={14} className="text-islamic-400" />
             <span className="text-xs text-foreground/50 uppercase tracking-wider">
               Сухур
             </span>
@@ -390,14 +390,14 @@ export default function RamadanTab() {
         </div>
 
         {/* Iftar */}
-        <div className="glass-card rounded-2xl p-4 text-center border border-orange-500/20">
+        <div className="glass-card rounded-2xl p-4 text-center border border-islamic-500/20">
           <div className="flex items-center justify-center gap-1.5 mb-2">
-            <Sun size={14} className="text-orange-400" />
+            <Sun size={14} className="text-islamic-400" />
             <span className="text-xs text-foreground/50 uppercase tracking-wider">
               Ифтар
             </span>
           </div>
-          <div className="text-2xl font-mono font-bold text-orange-400 mb-1">
+          <div className="text-2xl font-mono font-bold text-islamic-400 mb-1">
             {isLoadingLocation ? (
               <span className="text-foreground/30 text-lg">--:--</span>
             ) : (
@@ -417,7 +417,7 @@ export default function RamadanTab() {
       {/* All prayer times in Ramadan */}
       {!isLoadingLocation && prayerTimes && (
         <div className="glass-card rounded-2xl p-4 mb-4">
-          <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
+          <div className="text-xs text-islamic-400 uppercase tracking-widest mb-3 font-medium">
             Все времена
           </div>
           <div className="space-y-2">
@@ -467,11 +467,11 @@ export default function RamadanTab() {
             ].map((p) => (
               <div
                 key={p.key}
-                className={`flex items-center justify-between py-2 px-3 rounded-xl ${p.highlight ? "bg-orange-500/10 border border-orange-500/20" : "bg-white/3"}`}
+                className={`flex items-center justify-between py-2 px-3 rounded-xl ${p.highlight ? "bg-islamic-500/10 border border-islamic-500/20" : "bg-white/3"}`}
               >
                 <div>
                   <div
-                    className={`text-sm font-medium ${p.highlight ? "text-orange-400" : "text-foreground/80"}`}
+                    className={`text-sm font-medium ${p.highlight ? "text-islamic-400" : "text-foreground/80"}`}
                   >
                     {p.nameRu}
                   </div>
@@ -483,7 +483,7 @@ export default function RamadanTab() {
                   </div>
                 </div>
                 <div
-                  className={`font-mono text-lg font-bold ${p.highlight ? "text-orange-400" : "text-foreground/70"}`}
+                  className={`font-mono text-lg font-bold ${p.highlight ? "text-islamic-400" : "text-foreground/70"}`}
                 >
                   {formatTime(p.time)}
                 </div>
@@ -495,13 +495,13 @@ export default function RamadanTab() {
 
       {/* Ramadan duas */}
       <div className="glass-card rounded-2xl p-4 mb-4">
-        <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
+        <div className="text-xs text-islamic-400 uppercase tracking-widest mb-3 font-medium">
           Дуа Рамадана
         </div>
         <div className="space-y-4">
           {RAMADAN_DUAS.map((dua) => (
             <div key={dua.occasion} className="space-y-2">
-              <div className="text-[10px] text-orange-400/60 uppercase tracking-wider">
+              <div className="text-[10px] text-islamic-400/60 uppercase tracking-wider">
                 {dua.occasion}
               </div>
               <div
@@ -517,7 +517,7 @@ export default function RamadanTab() {
                 {dua.ru}
               </div>
               {dua !== RAMADAN_DUAS[RAMADAN_DUAS.length - 1] && (
-                <div className="border-t border-orange-500/10 mt-3" />
+                <div className="border-t border-islamic-500/10 mt-3" />
               )}
             </div>
           ))}
@@ -526,41 +526,41 @@ export default function RamadanTab() {
 
       {/* Ramadan tips */}
       <div className="glass-card rounded-2xl p-4 mb-4">
-        <div className="text-xs text-orange-400 uppercase tracking-widest mb-3 font-medium">
+        <div className="text-xs text-islamic-400 uppercase tracking-widest mb-3 font-medium">
           Напоминания
         </div>
         <ul className="space-y-2 text-foreground/60 text-sm">
           <li className="flex gap-2">
-            <span className="text-orange-500">•</span>Сухур желательно совершать
-            ближе к Фаджру
+            <span className="text-islamic-500">•</span>Сухур желательно
+            совершать ближе к Фаджру
           </li>
           <li className="flex gap-2">
-            <span className="text-orange-500">•</span>Ифтар начинайте с фиников
+            <span className="text-islamic-500">•</span>Ифтар начинайте с фиников
             и воды
           </li>
           <li className="flex gap-2">
-            <span className="text-orange-500">•</span>Таравих — 20 ракятов после
-            Иша
+            <span className="text-islamic-500">•</span>Таравих — 20 ракятов
+            после Иша
           </li>
           <li className="flex gap-2">
-            <span className="text-orange-500">•</span>Ищи Лайлятуль-Кадр в
+            <span className="text-islamic-500">•</span>Ищи Лайлятуль-Кадр в
             последние 10 ночей
           </li>
           <li className="flex gap-2">
-            <span className="text-orange-500">•</span>Умножай Коран, садаку и
+            <span className="text-islamic-500">•</span>Умножай Коран, садаку и
             дуа
           </li>
         </ul>
       </div>
 
       {/* Important notice */}
-      <div className="glass-card rounded-2xl p-4 mb-4 border border-orange-500/40 bg-orange-500/5">
+      <div className="glass-card rounded-2xl p-4 mb-4 border border-islamic-500/40 bg-islamic-500/5">
         <div className="flex items-start gap-3">
-          <div className="shrink-0 w-7 h-7 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center mt-0.5">
-            <span className="text-orange-400 text-xs font-bold">!</span>
+          <div className="shrink-0 w-7 h-7 rounded-lg bg-islamic-500/20 border border-islamic-500/40 flex items-center justify-center mt-0.5">
+            <span className="text-islamic-400 text-xs font-bold">!</span>
           </div>
           <div className="space-y-1">
-            <div className="text-orange-400 font-bold text-sm">Важно!</div>
+            <div className="text-islamic-400 font-bold text-sm">Важно!</div>
             <p className="text-foreground/60 text-xs leading-relaxed">
               Некоторые времена намаза или Рамадана могут не совпадать до
               точности и могут отличаться на 5–10 минут. Рекомендуем сверяться с

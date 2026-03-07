@@ -31,8 +31,8 @@ interface PrayerStep {
 // ─── Beautiful SVG Prayer Poses ───────────────────────────────────────────────
 function PrayerPoseSVG({ pose }: { pose: PrayerStep["poseType"] }) {
   const base = "w-full h-full";
-  const C = "#f97316"; // orange
-  const CL = "#f9731615"; // orange very light fill
+  const C = "#10b981"; // orange
+  const CL = "#10b98115"; // orange very light fill
 
   if (pose === "rakaat-label") {
     return (
@@ -1971,7 +1971,7 @@ const guideTabs: GuideTabDef[] = [
     labelKey: "prayer.dhuhr",
     subKey: "guide.4rakaat",
     rakaat: "4 ракаата",
-    color: "#f97316",
+    color: "#10b981",
     steps: buildDhuhrSteps(),
   },
   {
@@ -2084,7 +2084,7 @@ function StepSlide({
         <span className="text-xs text-foreground/30 font-medium">
           {step.stepNumber} / {total}
         </span>
-        <div className="h-px flex-1 bg-orange-500/15" />
+        <div className="h-px flex-1 bg-islamic-500/15" />
       </div>
 
       {/* Illustration */}
@@ -2245,7 +2245,7 @@ export default function PrayerGuide({ onBack }: { onBack: () => void }) {
           onClick={onBack}
           data-ocid="prayer_guide.back_button"
         >
-          <ArrowLeft size={18} className="text-orange-400" />
+          <ArrowLeft size={18} className="text-islamic-400" />
           <span>{tr("guide.back", lang)}</span>
         </button>
         <div className="text-center">

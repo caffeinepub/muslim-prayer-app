@@ -2966,7 +2966,7 @@ function renderBookCard({
   return (
     <button
       type="button"
-      className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
+      className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
       style={{
         border: `1px solid ${borderColor}`,
         boxShadow: `0 4px 20px ${shadowColor}`,
@@ -3169,11 +3169,11 @@ export default function BooksTab() {
       {/* Header */}
       <div className="text-center mb-6">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <BookOpen size={16} className="text-orange-500" />
+          <BookOpen size={16} className="text-islamic-500" />
           <h2 className="text-xl font-display font-bold text-gradient-orange">
             Исламские Книги
           </h2>
-          <BookOpen size={16} className="text-orange-500" />
+          <BookOpen size={16} className="text-islamic-500" />
         </div>
         <p className="text-foreground/40 text-xs">
           Коран и достоверные исламские источники
@@ -3185,7 +3185,7 @@ export default function BooksTab() {
         {/* Quran */}
         <button
           type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
+          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
           style={{
             border: "1px solid rgba(76,175,80,0.3)",
             boxShadow: "0 4px 20px rgba(76,175,80,0.1)",
@@ -3279,7 +3279,7 @@ export default function BooksTab() {
         {/* Bukhari */}
         <button
           type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
+          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
           style={{
             border: "1px solid rgba(180,130,40,0.3)",
             boxShadow: "0 4px 20px rgba(180,130,40,0.08)",
@@ -3377,7 +3377,7 @@ export default function BooksTab() {
         {/* 40 хадисов ан-Навави */}
         <button
           type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
+          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
           style={{
             border: "1px solid rgba(100,60,160,0.3)",
             boxShadow: "0 4px 20px rgba(100,60,160,0.08)",
@@ -3475,7 +3475,7 @@ export default function BooksTab() {
         {/* Рияд ас-Салихин */}
         <button
           type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
+          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
           style={{
             border: "1px solid rgba(20,120,60,0.3)",
             boxShadow: "0 4px 20px rgba(20,120,60,0.08)",
@@ -3740,7 +3740,7 @@ export default function BooksTab() {
       </div>
 
       {/* Bottom note */}
-      <div className="mt-6 glass-card rounded-xl p-4 border border-orange-500/10">
+      <div className="mt-6 glass-card rounded-xl p-4 border border-islamic-500/10">
         <p className="text-center text-foreground/30 text-xs leading-relaxed">
           «Читайте Коран, ибо поистине он придёт в День Воскресения как
           заступник за тех, кто читал его.» (Муслим)

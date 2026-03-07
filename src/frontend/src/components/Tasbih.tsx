@@ -133,7 +133,7 @@ function CounterCard({
   return (
     <div
       className={`glass-card rounded-2xl p-4 relative overflow-hidden transition-all duration-300 ${
-        isComplete ? "border-green-500/30" : "border-orange-500/10"
+        isComplete ? "border-green-500/30" : "border-islamic-500/10"
       }`}
       data-ocid={`tasbih.counter.item.${index}`}
     >
@@ -183,7 +183,7 @@ function CounterCard({
             className={`h-9 px-5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
               isComplete
                 ? "bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30"
-                : "bg-primary text-primary-foreground hover:bg-orange-400"
+                : "bg-primary text-primary-foreground hover:bg-islamic-400"
             }`}
             onClick={() => onIncrement(counter.name)}
             data-ocid={`tasbih.increment.button.${index}`}
@@ -194,7 +194,7 @@ function CounterCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-foreground/40 hover:text-orange-400"
+              className="h-7 w-7 text-foreground/40 hover:text-islamic-400"
               onClick={() => onReset(counter.name)}
               data-ocid={`tasbih.reset.button.${index}`}
               title="Сбросить"
@@ -218,7 +218,7 @@ function CounterCard({
       {/* Progress bar */}
       <div className="mt-3 h-1 bg-foreground/10 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-500 ${isComplete ? "bg-green-500" : "bg-orange-500"}`}
+          className={`h-full rounded-full transition-all duration-500 ${isComplete ? "bg-green-500" : "bg-islamic-500"}`}
           style={{
             width: `${Math.min((counter.count / counter.target) * 100, 100)}%`,
           }}
@@ -398,7 +398,7 @@ export default function TasbihTab() {
           <DialogTrigger asChild>
             <Button
               size="sm"
-              className="bg-primary text-primary-foreground hover:bg-orange-400 gap-1"
+              className="bg-primary text-primary-foreground hover:bg-islamic-400 gap-1"
               data-ocid="tasbih.add.open_modal_button"
             >
               <Plus size={14} />
@@ -450,7 +450,7 @@ export default function TasbihTab() {
                 Отмена
               </Button>
               <Button
-                className="bg-primary text-primary-foreground hover:bg-orange-400"
+                className="bg-primary text-primary-foreground hover:bg-islamic-400"
                 onClick={handleAdd}
                 data-ocid="tasbih.add.submit_button"
               >
@@ -471,8 +471,8 @@ export default function TasbihTab() {
           </p>
         </div>
       ) : (
-        <div className="glass-card rounded-xl p-3 mb-4 border border-orange-500/20 flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+        <div className="glass-card rounded-xl p-3 mb-4 border border-islamic-500/20 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-islamic-500 shrink-0" />
           <p className="text-xs text-foreground/50">
             Войдите для синхронизации счётчиков между устройствами
           </p>
@@ -489,7 +489,7 @@ export default function TasbihTab() {
         </div>
         <div className="h-2 bg-foreground/10 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-islamic-600 to-islamic-400 rounded-full transition-all duration-500"
             style={{
               width: `${Math.min((totalProgress.count / totalProgress.target) * 100, 100)}%`,
             }}
@@ -523,18 +523,18 @@ export default function TasbihTab() {
       </div>
 
       {/* Quick dhikr reminder */}
-      <div className="mt-6 glass-card rounded-xl p-4 border border-orange-500/10 space-y-2">
+      <div className="mt-6 glass-card rounded-xl p-4 border border-islamic-500/10 space-y-2">
         <div
-          className="text-center text-base text-orange-400/60 leading-relaxed"
+          className="text-center text-base text-islamic-400/60 leading-relaxed"
           style={{ fontFamily: "serif", direction: "rtl" }}
         >
           سُبْحَانَ اللهِ · الحَمْدُ لِلهِ · اللهُ أَكْبَرُ
         </div>
         <p className="text-center text-foreground/40 text-xs leading-relaxed">
           «Тот, кто произносит{" "}
-          <span className="text-orange-400">Субханаллах</span> 33 раза,{" "}
-          <span className="text-orange-400">Альхамдулиллах</span> 33 раза и{" "}
-          <span className="text-orange-400">Аллаху Акбар</span> 34 раза после
+          <span className="text-islamic-400">Субханаллах</span> 33 раза,{" "}
+          <span className="text-islamic-400">Альхамдулиллах</span> 33 раза и{" "}
+          <span className="text-islamic-400">Аллаху Акбар</span> 34 раза после
           намаза, — тому простятся грехи, даже если их столько, сколько морской
           пены.»
         </p>

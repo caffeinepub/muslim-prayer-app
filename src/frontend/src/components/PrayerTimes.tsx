@@ -155,9 +155,8 @@ function loadPrayersDone(): Set<string> {
     const raw = localStorage.getItem(PRAYER_TRACK_KEY);
     if (raw) {
       const data = JSON.parse(raw) as { date: string; keys: string[] };
-      if (data.date === getTodayKey()) {
-        return new Set(data.keys);
-      }
+      // Always load saved keys regardless of date — reset only happens at midnight in real-time
+      return new Set(data.keys);
     }
   } catch {
     // ignore
@@ -948,7 +947,7 @@ export default function PrayerTimesTab() {
       {/* Header Date Section */}
       <div className="px-4 pt-4 pb-3">
         <div className="glass-card rounded-2xl p-4 text-center space-y-1">
-          <div className="text-orange-400 text-sm font-medium tracking-widest uppercase">
+          <div className="text-islamic-400 text-sm font-medium tracking-widest uppercase">
             {formatHijriRu(todayHijri)}
           </div>
           <div className="text-foreground/60 text-xs">
@@ -963,7 +962,7 @@ export default function PrayerTimesTab() {
           {/* Header row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0">
-              <MapPin size={13} className="text-orange-500 shrink-0" />
+              <MapPin size={13} className="text-islamic-500 shrink-0" />
               <span className="text-foreground/70 text-xs font-medium uppercase tracking-wider">
                 Местоположение
               </span>
@@ -973,7 +972,7 @@ export default function PrayerTimesTab() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-orange-400 hover:text-orange-300"
+                  className="h-7 px-2 text-islamic-400 hover:text-islamic-300"
                   data-ocid="prayer.settings.open_modal_button"
                 >
                   <Settings size={14} />
@@ -981,7 +980,7 @@ export default function PrayerTimesTab() {
               </SheetTrigger>
               <SheetContent
                 side="bottom"
-                className="bg-card border-orange-500/20 rounded-t-2xl"
+                className="bg-card border-islamic-500/20 rounded-t-2xl"
                 data-ocid="prayer.settings.dialog"
               >
                 <SheetHeader className="pb-4">
@@ -1033,7 +1032,7 @@ export default function PrayerTimesTab() {
                 </div>
                 <SheetFooter className="pt-4">
                   <Button
-                    className="w-full bg-primary text-primary-foreground hover:bg-orange-400"
+                    className="w-full bg-primary text-primary-foreground hover:bg-islamic-400"
                     onClick={handleSaveSettings}
                   >
                     {isLoggedIn
@@ -1051,7 +1050,7 @@ export default function PrayerTimesTab() {
           >
             <MapPin
               size={12}
-              className={`shrink-0 ${locationError ? "text-red-400" : "text-orange-400"}`}
+              className={`shrink-0 ${locationError ? "text-red-400" : "text-islamic-400"}`}
             />
             <span className="text-foreground/80 text-xs truncate flex-1">
               {isLoadingLocation ? (
@@ -1074,13 +1073,13 @@ export default function PrayerTimesTab() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full h-9 text-xs border-orange-500/30 bg-orange-500/5 text-orange-300 hover:bg-orange-500/15 hover:text-orange-200 hover:border-orange-500/50 gap-2"
+              className="w-full h-9 text-xs border-islamic-500/30 bg-islamic-500/5 text-islamic-300 hover:bg-islamic-500/15 hover:text-islamic-200 hover:border-islamic-500/50 gap-2"
               onClick={requestLocation}
               disabled={isLoadingLocation}
               data-ocid="prayer.location.button"
             >
               {isLoadingLocation ? (
-                <span className="w-3.5 h-3.5 border-2 border-orange-400/40 border-t-orange-400 rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-islamic-400/40 border-t-islamic-400 rounded-full animate-spin" />
               ) : (
                 <Locate size={13} />
               )}
@@ -1099,7 +1098,7 @@ export default function PrayerTimesTab() {
               />
               <Button
                 size="sm"
-                className="h-9 px-3 bg-primary text-primary-foreground hover:bg-orange-400 shrink-0"
+                className="h-9 px-3 bg-primary text-primary-foreground hover:bg-islamic-400 shrink-0"
                 onClick={handleCitySearch}
                 disabled={isSearching || !citySearch.trim()}
                 data-ocid="prayer.location.submit_button"
@@ -1118,20 +1117,20 @@ export default function PrayerTimesTab() {
       {/* Next Prayer Countdown */}
       {!isLoadingLocation && prayerTimes && next && (
         <div className="px-4 mb-4">
-          <div className="glass-card rounded-2xl p-4 text-center border border-orange-500/30 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent" />
+          <div className="glass-card rounded-2xl p-4 text-center border border-islamic-500/30 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-islamic-500/5 to-transparent" />
             <div className="relative">
               <div className="text-xs text-foreground/50 uppercase tracking-widest mb-1">
                 {current ? "Текущий намаз" : "Следующий намаз"}
               </div>
-              <div className="text-2xl font-display font-bold text-orange-400 mb-1">
+              <div className="text-2xl font-display font-bold text-islamic-400 mb-1">
                 {next.nameRu}
               </div>
               <div className="text-foreground/50 text-sm arabic-text mb-3">
                 {next.nameArabic}
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Clock size={14} className="text-orange-500" />
+                <Clock size={14} className="text-islamic-500" />
                 <span className="font-mono text-3xl font-bold text-foreground tracking-wider">
                   {formatCountdown(countdown)}
                 </span>
@@ -1147,10 +1146,10 @@ export default function PrayerTimesTab() {
       {/* Location Permission Prompt */}
       {showLocationPrompt && !isLoadingLocation && !coords && (
         <div className="px-4 mb-4">
-          <div className="glass-card rounded-2xl p-6 text-center space-y-4 border border-orange-500/20">
+          <div className="glass-card rounded-2xl p-6 text-center space-y-4 border border-islamic-500/20">
             <div className="flex items-center justify-center">
-              <div className="w-14 h-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center">
-                <MapPin size={26} className="text-orange-400" />
+              <div className="w-14 h-14 rounded-2xl bg-islamic-500/15 border border-islamic-500/30 flex items-center justify-center">
+                <MapPin size={26} className="text-islamic-400" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -1163,7 +1162,7 @@ export default function PrayerTimesTab() {
               </div>
             </div>
             <Button
-              className="w-full bg-primary text-primary-foreground hover:bg-orange-400 gap-2 h-10"
+              className="w-full bg-primary text-primary-foreground hover:bg-islamic-400 gap-2 h-10"
               onClick={requestLocation}
               data-ocid="prayer.geolocation.primary_button"
             >
@@ -1196,7 +1195,7 @@ export default function PrayerTimesTab() {
                   key={prayer.key}
                   className={`glass-card rounded-xl px-4 py-3 flex items-center justify-between transition-all duration-300 ${
                     isNext && !isSunrise
-                      ? "bg-orange-500/10 border border-orange-500/35"
+                      ? "bg-islamic-500/10 border border-islamic-500/35"
                       : isDone
                         ? "border-green-500/30"
                         : isCurrent && !isSunrise
@@ -1212,7 +1211,7 @@ export default function PrayerTimesTab() {
                           isDone
                             ? "text-green-400"
                             : isNext && !isSunrise
-                              ? "text-orange-400 font-bold"
+                              ? "text-islamic-400 font-bold"
                               : "text-foreground"
                         }`}
                       >
@@ -1237,13 +1236,13 @@ export default function PrayerTimesTab() {
                         isDone
                           ? "text-green-400"
                           : isNext && !isSunrise
-                            ? "text-orange-400 font-bold"
+                            ? "text-islamic-400 font-bold"
                             : "text-foreground/80"
                       }`}
                     >
                       {formatTime(prayer.time)}
                       {isNext && !isSunrise && (
-                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                        <span className="ml-2 inline-block w-2 h-2 rounded-full bg-islamic-500 animate-pulse" />
                       )}
                     </div>
                     {/* Checkbox — only for the 5 prayers */}
@@ -1264,7 +1263,7 @@ export default function PrayerTimesTab() {
                         ) : (
                           <Circle
                             size={22}
-                            className="text-foreground/20 hover:text-orange-400/60"
+                            className="text-foreground/20 hover:text-islamic-400/60"
                           />
                         )}
                       </button>
