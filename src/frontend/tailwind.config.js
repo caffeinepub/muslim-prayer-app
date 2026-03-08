@@ -20,7 +20,7 @@ export default {
         display: ["Bricolage Grotesque", "sans-serif"],
       },
       colors: {
-        // Islamic green (emerald) scale — replaces orange
+        // Orange (ember/sunset) scale — primary Islamic color
         islamic: {
           50: "oklch(var(--islamic-50))",
           100: "oklch(var(--islamic-100))",
@@ -40,7 +40,7 @@ export default {
           500: "oklch(var(--gold-500))",
           600: "oklch(var(--gold-600))",
         },
-        // Keep orange alias pointing to islamic for backward compat in older refs
+        // Orange alias for backward compat
         orange: {
           50: "oklch(var(--islamic-50))",
           100: "oklch(var(--islamic-100))",
@@ -111,12 +111,13 @@ export default {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
-        islamic: "0 0 20px oklch(var(--islamic-500) / 0.2)",
-        "islamic-lg": "0 0 40px oklch(var(--islamic-500) / 0.25)",
-        gold: "0 0 20px oklch(var(--gold-500) / 0.2)",
-        // keep old names mapped to new
-        orange: "0 0 20px oklch(var(--islamic-500) / 0.2)",
-        "orange-lg": "0 0 40px oklch(var(--islamic-500) / 0.25)",
+        islamic: "0 0 20px oklch(var(--islamic-500) / 0.25)",
+        "islamic-lg": "0 0 40px oklch(var(--islamic-500) / 0.3)",
+        gold: "0 0 20px oklch(var(--gold-500) / 0.25)",
+        orange: "0 0 20px oklch(var(--islamic-500) / 0.25)",
+        "orange-lg": "0 0 40px oklch(var(--islamic-500) / 0.3)",
+        blue: "0 0 20px oklch(0.62 0.18 240 / 0.25)",
+        "blue-lg": "0 0 40px oklch(0.62 0.18 240 / 0.3)",
       },
       keyframes: {
         "accordion-down": {
@@ -135,10 +136,13 @@ export default {
           "0%, 100%": { boxShadow: "0 0 0 0 oklch(var(--islamic-500) / 0.3)" },
           "50%": { boxShadow: "0 0 0 8px oklch(var(--islamic-500) / 0)" },
         },
-        // keep old name mapped
         "pulse-orange": {
           "0%, 100%": { boxShadow: "0 0 0 0 oklch(var(--islamic-500) / 0.3)" },
           "50%": { boxShadow: "0 0 0 8px oklch(var(--islamic-500) / 0)" },
+        },
+        "pulse-blue": {
+          "0%, 100%": { boxShadow: "0 0 0 0 oklch(0.62 0.18 240 / 0.3)" },
+          "50%": { boxShadow: "0 0 0 8px oklch(0.62 0.18 240 / 0)" },
         },
       },
       animation: {
@@ -147,6 +151,7 @@ export default {
         "spin-slow": "spin-slow 8s linear infinite",
         "pulse-green": "pulse-green 2s ease-in-out infinite",
         "pulse-orange": "pulse-orange 2s ease-in-out infinite",
+        "pulse-blue": "pulse-blue 2s ease-in-out infinite",
       },
     },
   },

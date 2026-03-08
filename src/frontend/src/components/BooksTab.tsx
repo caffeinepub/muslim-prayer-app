@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
 import { type LangCode, tr, useLanguage } from "../hooks/useLanguage";
 import { playBookOpen } from "../utils/sounds";
+import { type CustomBook, getCustomBooks } from "./AdminBooksEditor";
 
 // ─────────────────────────────────────────────
 // Types
@@ -3049,6 +3050,428 @@ function renderBookCard({
   );
 }
 
+// ─────────────────────────────────────────────
+// Custom Book Reading Views
+// ─────────────────────────────────────────────
+function CustomHadithChapterView({
+  chapter,
+  onBack,
+  accentColor,
+  bgColor,
+}: {
+  chapter: {
+    title: string;
+    titleArabic?: string;
+    hadiths: {
+      id: string;
+      number: number;
+      arabic: string;
+      translation: string;
+      narrator?: string;
+    }[];
+  };
+  onBack: () => void;
+  accentColor: string;
+  bgColor: string;
+}) {
+  const lang = useLanguage();
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: bgColor }}>
+      <div
+        className="sticky top-0 z-10 flex items-center justify-between px-4 py-3"
+        style={{
+          background: bgColor,
+          borderBottom: `1px solid ${accentColor}33`,
+        }}
+      >
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium"
+          style={{ color: accentColor }}
+          onClick={onBack}
+          data-ocid="custom.chapter.back_button"
+        >
+          <ArrowLeft size={18} />
+          <span>{tr("guide.back", lang)}</span>
+        </button>
+        <div className="text-center">
+          <div className="text-xs font-bold" style={{ color: accentColor }}>
+            {chapter.title}
+          </div>
+          {chapter.titleArabic && (
+            <div
+              className="text-xs"
+              style={{
+                color: accentColor,
+                fontFamily: "serif",
+                direction: "rtl",
+              }}
+            >
+              {chapter.titleArabic}
+            </div>
+          )}
+        </div>
+        <div className="w-16" />
+      </div>
+      <div className="flex-1 px-4 py-5 pb-24 space-y-5">
+        {chapter.hadiths.map((hadith, idx) => (
+          <div
+            key={hadith.id}
+            className="rounded-2xl overflow-hidden"
+            style={{
+              border: `1px solid ${accentColor}33`,
+              boxShadow: `0 2px 8px ${accentColor}10`,
+            }}
+            data-ocid={`custom.hadith.item.${idx + 1}`}
+          >
+            <div
+              className="px-4 py-2 flex items-center justify-between"
+              style={{ background: `${accentColor}18` }}
+            >
+              <span
+                className="text-xs font-bold"
+                style={{ color: accentColor }}
+              >
+                Хадис № {hadith.number}
+              </span>
+            </div>
+            <div className="px-4 py-4" style={{ background: bgColor }}>
+              <p
+                className="text-right leading-loose text-lg mb-3"
+                style={{
+                  fontFamily: "serif",
+                  direction: "rtl",
+                  color: "#1a1a1a",
+                  lineHeight: "2",
+                }}
+              >
+                {hadith.arabic}
+              </p>
+              {lang !== "ar" && (
+                <>
+                  <div
+                    className="h-px mb-3"
+                    style={{ background: `${accentColor}25` }}
+                  />
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: "#444", lineHeight: "1.75" }}
+                  >
+                    {hadith.translation}
+                  </p>
+                  {hadith.narrator && (
+                    <div
+                      className="mt-3 pt-2"
+                      style={{ borderTop: `1px solid ${accentColor}20` }}
+                    >
+                      <span
+                        className="text-xs font-semibold"
+                        style={{ color: accentColor }}
+                      >
+                        Передатчик:{" "}
+                      </span>
+                      <span className="text-xs" style={{ color: "#666" }}>
+                        {hadith.narrator}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+        {chapter.hadiths.length === 0 && (
+          <div
+            className="text-center py-12 text-sm"
+            style={{ color: accentColor }}
+          >
+            Хадисы не добавлены
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CustomBookView({
+  book,
+  onBack,
+}: {
+  book: CustomBook;
+  onBack: () => void;
+}) {
+  const lang = useLanguage();
+  const [selectedChapter, setSelectedChapter] = useState<
+    NonNullable<CustomBook["chapters"]>[number] | null
+  >(null);
+
+  const accentColor = book.coverColor;
+  const bgColor = "#fdfaf3";
+
+  if (book.type === "quran_surah") {
+    return (
+      <div
+        className="min-h-screen flex flex-col"
+        style={{ background: "#faf8f0" }}
+      >
+        <div
+          className="sticky top-0 z-10 flex items-center justify-between px-4 py-3"
+          style={{
+            background: "#faf8f0",
+            borderBottom: "1px solid rgba(76,175,80,0.2)",
+          }}
+        >
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm font-medium"
+            style={{ color: "#2e7d32" }}
+            onClick={onBack}
+            data-ocid="custom.surah.back_button"
+          >
+            <ArrowLeft size={18} />
+            <span>{tr("guide.back", lang)}</span>
+          </button>
+          <div className="text-center">
+            <div className="text-sm font-bold" style={{ color: "#1a3c1a" }}>
+              {book.title}
+            </div>
+            {book.titleArabic && (
+              <div
+                className="text-xs"
+                style={{ color: "#4caf50", fontFamily: "serif" }}
+              >
+                {book.titleArabic}
+              </div>
+            )}
+          </div>
+          <div className="w-16" />
+        </div>
+        <div className="flex-1 px-4 py-5 pb-24 space-y-4">
+          {book.description && (
+            <div
+              className="rounded-2xl p-4"
+              style={{
+                background: "rgba(76,175,80,0.07)",
+                border: "1px solid rgba(76,175,80,0.2)",
+              }}
+            >
+              <p className="text-sm leading-relaxed" style={{ color: "#333" }}>
+                {book.description}
+              </p>
+            </div>
+          )}
+          {(book.ayahs ?? []).map((ayah, idx) => (
+            <div
+              key={ayah.id}
+              className="py-4"
+              style={{
+                borderBottom:
+                  idx < (book.ayahs ?? []).length - 1
+                    ? "1px solid rgba(76,175,80,0.12)"
+                    : "none",
+              }}
+              data-ocid={`custom.ayah.item.${idx + 1}`}
+            >
+              <div
+                className="flex items-start gap-2 justify-end mb-2"
+                style={{ direction: "rtl" }}
+              >
+                <p
+                  className="text-right leading-loose flex-1"
+                  style={{
+                    fontFamily: "serif",
+                    fontSize: "1.5rem",
+                    color: "#1a1a1a",
+                    lineHeight: "2.2",
+                  }}
+                >
+                  {ayah.arabic}
+                </p>
+                <div className="mt-2 flex-shrink-0">
+                  <AyahMedallion number={ayah.number} />
+                </div>
+              </div>
+              {lang !== "ar" && (
+                <p
+                  className="text-sm leading-relaxed mt-1"
+                  style={{ color: "#5a5a5a", lineHeight: "1.7" }}
+                >
+                  <span
+                    style={{
+                      color: "#4caf50",
+                      fontWeight: 600,
+                      marginRight: "4px",
+                    }}
+                  >
+                    {ayah.number}.
+                  </span>
+                  {ayah.translation}
+                </p>
+              )}
+            </div>
+          ))}
+          {(book.ayahs ?? []).length === 0 && (
+            <div className="text-center py-12" style={{ color: "#4caf50" }}>
+              Аяты не добавлены
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // hadith / general: chapters → hadiths
+  if (selectedChapter) {
+    return (
+      <CustomHadithChapterView
+        chapter={selectedChapter}
+        onBack={() => setSelectedChapter(null)}
+        accentColor={accentColor}
+        bgColor={bgColor}
+      />
+    );
+  }
+
+  const chapters = book.chapters ?? [];
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: bgColor }}>
+      <div
+        className="sticky top-0 z-10 flex items-center justify-between px-4 py-3"
+        style={{
+          background: bgColor,
+          borderBottom: `1px solid ${accentColor}33`,
+        }}
+      >
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium"
+          style={{ color: accentColor }}
+          onClick={onBack}
+          data-ocid="custom.book.back_button"
+        >
+          <ArrowLeft size={18} />
+          <span>{tr("guide.back", lang)}</span>
+        </button>
+        <div className="text-center">
+          <div className="text-base font-bold" style={{ color: "#1a1209" }}>
+            {book.title}
+          </div>
+          {book.titleArabic && (
+            <div
+              className="text-xs"
+              style={{
+                color: accentColor,
+                fontFamily: "serif",
+                direction: "rtl",
+              }}
+            >
+              {book.titleArabic}
+            </div>
+          )}
+        </div>
+        <div className="w-16" />
+      </div>
+      <div className="flex-1 px-4 py-4 pb-24">
+        {book.description && (
+          <div
+            className="rounded-2xl p-4 mb-5"
+            style={{
+              background: `${accentColor}12`,
+              border: `1px solid ${accentColor}33`,
+            }}
+          >
+            <p
+              className="text-xs text-center"
+              style={{ color: accentColor, lineHeight: "1.6" }}
+            >
+              {book.description}
+            </p>
+          </div>
+        )}
+        <div className="space-y-2">
+          {chapters.map((chapter, idx) => (
+            <button
+              type="button"
+              key={chapter.id}
+              className="w-full rounded-xl px-4 py-4 flex items-center gap-3 transition-all duration-200 text-left"
+              style={{
+                background: `${accentColor}0f`,
+                border: `1px solid ${accentColor}25`,
+              }}
+              onClick={() => {
+                playBookOpen();
+                setSelectedChapter(chapter);
+              }}
+              data-ocid={`custom.chapter.item.${idx + 1}`}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  background: `${accentColor}22`,
+                  border: `1px solid ${accentColor}40`,
+                }}
+              >
+                <span
+                  className="text-xs font-bold"
+                  style={{ color: accentColor }}
+                >
+                  {chapter.id ? idx + 1 : idx + 1}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-semibold text-sm"
+                  style={{ color: "#1a1209" }}
+                >
+                  {chapter.title}
+                </div>
+                {chapter.titleArabic && (
+                  <div
+                    className="text-xs mt-0.5"
+                    style={{
+                      color: accentColor,
+                      fontFamily: "serif",
+                      direction: "rtl",
+                    }}
+                  >
+                    {chapter.titleArabic}
+                  </div>
+                )}
+                <div className="text-xs mt-1" style={{ color: "#888" }}>
+                  {chapter.hadiths.length}{" "}
+                  {chapter.hadiths.length === 1
+                    ? "хадис"
+                    : chapter.hadiths.length < 5
+                      ? "хадиса"
+                      : "хадисов"}
+                </div>
+              </div>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={accentColor}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          ))}
+          {chapters.length === 0 && (
+            <div className="text-center py-12" style={{ color: accentColor }}>
+              Главы не добавлены
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type BookView =
   | "shelf"
   | "quran"
@@ -3062,10 +3485,14 @@ type BookView =
   | "iman"
   | "muslima"
   | "time"
-  | "encyclopedia";
+  | "encyclopedia"
+  | "custom";
 
 export default function BooksTab() {
   const [view, setView] = useState<BookView>("shelf");
+  const [selectedCustomBook, setSelectedCustomBook] =
+    useState<CustomBook | null>(null);
+  const customBooks = getCustomBooks();
 
   if (view === "quran")
     return <QuranBookView onBack={() => setView("shelf")} />;
@@ -3163,6 +3590,17 @@ export default function BooksTab() {
     );
   if (view === "encyclopedia")
     return <EncyclopediaView onBack={() => setView("shelf")} />;
+
+  if (view === "custom" && selectedCustomBook)
+    return (
+      <CustomBookView
+        book={selectedCustomBook}
+        onBack={() => {
+          setView("shelf");
+          setSelectedCustomBook(null);
+        }}
+      />
+    );
 
   return (
     <div className="flex flex-col px-4 py-4" data-ocid="books.shelf.panel">
@@ -3738,6 +4176,118 @@ export default function BooksTab() {
           setView,
         })}
       </div>
+
+      {/* ── Custom Books ── */}
+      {customBooks.length > 0 && (
+        <>
+          <div className="mt-6 mb-3 flex items-center gap-2">
+            <div className="h-px flex-1 bg-islamic-500/10" />
+            <span className="text-xs text-muted-foreground/50 font-medium px-2">
+              Добавленные книги
+            </span>
+            <div className="h-px flex-1 bg-islamic-500/10" />
+          </div>
+          {customBooks.map((book, idx) => (
+            <button
+              key={book.id}
+              type="button"
+              className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60 mb-4"
+              style={{
+                border: `1px solid ${book.coverColor}55`,
+                boxShadow: `0 4px 20px ${book.coverColor}18`,
+              }}
+              onClick={() => {
+                playBookOpen();
+                setSelectedCustomBook(book);
+                setView("custom");
+              }}
+              data-ocid={`books.custom.button.${idx + 1}`}
+            >
+              <div
+                className="px-5 py-5 flex items-center gap-4"
+                style={{
+                  background: `linear-gradient(135deg, ${book.coverColor} 0%, ${book.coverColor}cc 100%)`,
+                }}
+              >
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: "rgba(255,255,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <BookOpen size={20} className="text-white/80" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-white font-bold text-lg leading-tight truncate">
+                    {book.title}
+                  </div>
+                  {book.titleArabic && (
+                    <div
+                      className="text-white/60 text-xs mt-0.5"
+                      style={{ direction: "rtl", fontFamily: "serif" }}
+                    >
+                      {book.titleArabic}
+                    </div>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: "rgba(255,255,255,0.15)",
+                        color: "#fff",
+                      }}
+                    >
+                      {book.type === "quran_surah"
+                        ? "Сура"
+                        : book.type === "hadith"
+                          ? "Хадисы"
+                          : "Книга"}
+                    </span>
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: "rgba(255,255,255,0.15)",
+                        color: "#fff",
+                      }}
+                    >
+                      {book.type === "quran_surah"
+                        ? `${book.ayahs?.length ?? 0} аятов`
+                        : `${book.chapters?.length ?? 0} глав`}
+                    </span>
+                  </div>
+                </div>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.6)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+              {book.description && (
+                <div
+                  className="px-5 py-3"
+                  style={{
+                    background: `${book.coverColor}0f`,
+                    borderTop: `1px solid ${book.coverColor}25`,
+                  }}
+                >
+                  <p className="text-xs" style={{ color: "#5a5a5a" }}>
+                    {book.description}
+                  </p>
+                </div>
+              )}
+            </button>
+          ))}
+        </>
+      )}
 
       {/* Bottom note */}
       <div className="mt-6 glass-card rounded-xl p-4 border border-islamic-500/10">

@@ -20,69 +20,69 @@
   :root {
     --radius: 0.75rem;
 
-    /* Islamic dark theme — deep navy/dark with emerald+gold accents */
-    --background: 0.1 0.012 240;
-    --foreground: 0.96 0.006 80;
+    /* Islamic luxury dark theme — deep midnight blue-black with warm orange & sapphire blue accents */
+    --background: 0.08 0.018 240;
+    --foreground: 0.96 0.008 60;
 
-    --card: 0.13 0.014 240;
-    --card-foreground: 0.96 0.006 80;
+    --card: 0.11 0.020 240;
+    --card-foreground: 0.96 0.008 60;
 
-    --popover: 0.16 0.014 240;
-    --popover-foreground: 0.96 0.006 80;
+    --popover: 0.14 0.022 240;
+    --popover-foreground: 0.96 0.008 60;
 
-    /* Emerald green primary */
-    --primary: 0.68 0.18 155;
-    --primary-foreground: 0.08 0.01 240;
+    /* Deep rich orange — ember / desert sunset */
+    --primary: 0.68 0.20 42;
+    --primary-foreground: 0.97 0.005 60;
 
-    --secondary: 0.18 0.018 240;
-    --secondary-foreground: 0.96 0.006 80;
+    --secondary: 0.15 0.020 240;
+    --secondary-foreground: 0.96 0.008 60;
 
-    --muted: 0.18 0.018 240;
-    --muted-foreground: 0.60 0.015 220;
+    --muted: 0.15 0.020 240;
+    --muted-foreground: 0.55 0.015 220;
 
-    /* Gold accent */
-    --accent: 0.78 0.16 80;
+    /* Sapphire blue accent */
+    --accent: 0.62 0.18 240;
     --accent-foreground: 0.08 0.01 240;
 
     --destructive: 0.58 0.22 25;
-    --destructive-foreground: 0.96 0.006 80;
+    --destructive-foreground: 0.97 0.008 60;
 
-    --border: 0.96 0.006 80 / 10%;
-    --input: 0.96 0.006 80 / 12%;
-    --ring: 0.68 0.18 155;
+    --border: 0.97 0.005 60 / 10%;
+    --input: 0.97 0.005 60 / 12%;
+    --ring: 0.68 0.20 42;
 
-    --chart-1: 0.68 0.18 155;
-    --chart-2: 0.78 0.16 80;
-    --chart-3: 0.58 0.14 155;
-    --chart-4: 0.48 0.10 155;
-    --chart-5: 0.38 0.07 155;
+    --chart-1: 0.68 0.20 42;
+    --chart-2: 0.62 0.18 240;
+    --chart-3: 0.75 0.17 75;
+    --chart-4: 0.52 0.18 240;
+    --chart-5: 0.45 0.15 42;
 
-    --sidebar: 0.12 0.012 240;
-    --sidebar-foreground: 0.96 0.006 80;
-    --sidebar-primary: 0.68 0.18 155;
-    --sidebar-primary-foreground: 0.08 0.01 240;
-    --sidebar-accent: 0.18 0.018 240;
-    --sidebar-accent-foreground: 0.96 0.006 80;
-    --sidebar-border: 0.96 0.006 80 / 10%;
-    --sidebar-ring: 0.68 0.18 155;
+    --sidebar: 0.09 0.018 240;
+    --sidebar-foreground: 0.96 0.008 60;
+    --sidebar-primary: 0.68 0.20 42;
+    --sidebar-primary-foreground: 0.97 0.005 60;
+    --sidebar-accent: 0.15 0.020 240;
+    --sidebar-accent-foreground: 0.96 0.008 60;
+    --sidebar-border: 0.97 0.005 60 / 10%;
+    --sidebar-ring: 0.68 0.20 42;
 
-    /* Emerald (Islamic green) scale */
-    --islamic-50: 0.97 0.04 155;
-    --islamic-100: 0.93 0.08 155;
-    --islamic-200: 0.87 0.12 155;
-    --islamic-300: 0.80 0.16 155;
-    --islamic-400: 0.74 0.18 155;
-    --islamic-500: 0.68 0.18 155;
-    --islamic-600: 0.61 0.17 155;
-    --islamic-700: 0.54 0.15 155;
-    --islamic-800: 0.46 0.12 155;
-    --islamic-900: 0.38 0.09 155;
+    /* Orange (Islamic) scale — deep warm ember */
+    --islamic-50:  0.97 0.04 42;
+    --islamic-100: 0.92 0.08 42;
+    --islamic-200: 0.86 0.12 42;
+    --islamic-300: 0.80 0.16 42;
+    --islamic-400: 0.74 0.18 42;
+    --islamic-500: 0.68 0.20 42;
+    --islamic-600: 0.60 0.18 42;
+    --islamic-700: 0.50 0.16 42;
+    --islamic-800: 0.40 0.12 42;
+    --islamic-900: 0.30 0.08 42;
 
-    /* Gold scale */
-    --gold-300: 0.88 0.14 85;
-    --gold-400: 0.82 0.16 82;
-    --gold-500: 0.75 0.17 80;
-    --gold-600: 0.68 0.15 78;
+    /* Gold scale — warm brass */
+    --gold-300: 0.88 0.14 78;
+    --gold-400: 0.82 0.16 75;
+    --gold-500: 0.74 0.17 72;
+    --gold-600: 0.66 0.15 70;
   }
 
   * {
@@ -115,7 +115,7 @@
 
   /* Geometric pattern background */
   .islamic-pattern {
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f97316' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 
   /* Glassmorphism card */
@@ -125,7 +125,7 @@
     border: 1px solid oklch(var(--islamic-500) / 0.15);
   }
 
-  /* Active prayer glow */
+  /* Active prayer glow — orange */
   .prayer-active {
     border-color: oklch(var(--islamic-500) / 0.6);
     box-shadow: 0 0 20px oklch(var(--islamic-500) / 0.15), inset 0 0 20px oklch(var(--islamic-500) / 0.05);
@@ -143,7 +143,7 @@
 
   /* Tab bar */
   .bottom-nav {
-    background: oklch(0.12 0.012 240 / 0.95);
+    background: oklch(0.09 0.018 240 / 0.95);
     backdrop-filter: blur(16px);
     border-top: 1px solid oklch(var(--islamic-500) / 0.15);
   }
@@ -171,17 +171,17 @@
   .stagger-children > *:nth-child(5) { animation-delay: 0.25s; opacity: 0; animation: fadeIn 0.4s ease-out 0.25s forwards; }
   .stagger-children > *:nth-child(6) { animation-delay: 0.30s; opacity: 0; animation: fadeIn 0.4s ease-out 0.30s forwards; }
 
-  /* Islamic green gradient text */
+  /* Orange-to-gold gradient text */
   .text-gradient-orange {
-    background: linear-gradient(135deg, oklch(var(--gold-400)), oklch(var(--gold-300)));
+    background: linear-gradient(135deg, oklch(var(--gold-400)), oklch(0.80 0.20 42));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Islamic green gradient text variant */
+  /* Sapphire blue gradient text */
   .text-gradient-green {
-    background: linear-gradient(135deg, oklch(var(--islamic-400)), oklch(var(--islamic-300)));
+    background: linear-gradient(135deg, oklch(var(--accent)), oklch(0.72 0.16 220));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

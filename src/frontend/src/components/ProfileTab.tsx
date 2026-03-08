@@ -7,6 +7,7 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  Edit,
   Loader2,
   Lock,
   LogOut,
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { useFirebaseAuth } from "../hooks/useFirebaseAuth";
 import { tr, useLanguage } from "../hooks/useLanguage";
 import { useGetTasbihCounters } from "../hooks/useQueries";
+import AdminBooksEditor from "./AdminBooksEditor";
 import PrayerGuide from "./PrayerGuide";
 
 // Специальный пароль автора (только для администратора)
@@ -1041,9 +1043,14 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
   const totalTasbih =
     tasbihCounters?.reduce((acc, c) => acc + Number(c.count), 0) ?? 0;
   const [showPrayerGuide, setShowPrayerGuide] = useState(false);
+  const [showBooksEditor, setShowBooksEditor] = useState(false);
 
   if (showPrayerGuide) {
     return <PrayerGuide onBack={() => setShowPrayerGuide(false)} />;
+  }
+
+  if (showBooksEditor) {
+    return <AdminBooksEditor onBack={() => setShowBooksEditor(false)} />;
   }
 
   return (
@@ -1123,6 +1130,45 @@ function AuthorProfileScreen({ onSignOut }: { onSignOut: () => void }) {
 
       {/* ── Prayer Guide Card ── */}
       <PrayerGuideCard onOpen={() => setShowPrayerGuide(true)} />
+
+      {/* ── Admin: Manage Books ── */}
+      <motion.button
+        type="button"
+        onClick={() => setShowBooksEditor(true)}
+        whileTap={{ scale: 0.97 }}
+        className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/50"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.14 0.04 45) 0%, oklch(0.18 0.06 45) 60%, oklch(0.22 0.09 45) 100%)",
+          border: "1px solid oklch(0.55 0.18 45 / 0.35)",
+          boxShadow: "0 4px 24px oklch(0.55 0.18 45 / 0.15)",
+        }}
+        data-ocid="profile.admin.books_editor.button"
+      >
+        <div className="flex items-center gap-4 px-4 py-4">
+          {/* Icon */}
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+            style={{
+              background: "oklch(0.55 0.18 45 / 0.2)",
+              border: "1px solid oklch(0.55 0.18 45 / 0.4)",
+            }}
+          >
+            <Edit size={20} className="text-islamic-400" />
+          </div>
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-foreground">
+              Управление книгами
+            </div>
+            <div className="text-xs text-foreground/40 mt-0.5">
+              Добавлять, редактировать и удалять книги
+            </div>
+          </div>
+          {/* Arrow */}
+          <BookOpen size={16} className="text-islamic-400/50 shrink-0" />
+        </div>
+      </motion.button>
 
       {/* ── Sign out ── */}
       <Button
