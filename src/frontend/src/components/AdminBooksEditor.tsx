@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import JSZip from "jszip";
 import {
   ArrowLeft,
   BookOpen,
@@ -1282,6 +1283,77 @@ function BookForm({
 }
 
 // ─── FileUpload helper ────────────────────────────────────────────────────────
+
+function parseBookJson(
+  parsed: unknown,
+  onImport: (book: CustomBook) => void,
+  fileName?: string,
+): number {
+  const raw: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+  let imported = 0;
+  for (const [idx, item] of raw.entries()) {
+    const b = item as Partial<CustomBook>;
+    // Generate a fallback title from filename or index if missing
+    const fallbackTitle = fileName
+      ? raw.length > 1
+        ? `${fileName.replace(/\.json$/i, "")} (${idx + 1})`
+        : fileName.replace(/\.json$/i, "")
+      : `Книга ${idx + 1}`;
+    const resolvedTitle =
+      b.title && typeof b.title === "string" && b.title.trim()
+        ? b.title.trim()
+        : fallbackTitle;
+    const book: CustomBook = {
+      id: generateId(),
+      title: resolvedTitle,
+      titleArabic:
+        typeof b.titleArabic === "string"
+          ? b.titleArabic.trim() || undefined
+          : undefined,
+      description:
+        typeof b.description === "string"
+          ? b.description.trim() || undefined
+          : undefined,
+      coverColor:
+        typeof b.coverColor === "string"
+          ? b.coverColor
+          : COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)],
+      type: (["hadith", "quran_surah", "general"] as const).includes(
+        b.type as "hadith",
+      )
+        ? (b.type as CustomBook["type"])
+        : "general",
+      chapters: Array.isArray(b.chapters)
+        ? (b.chapters as CustomChapter[]).map((ch) => ({
+            id: ch.id ?? generateId(),
+            title: ch.title ?? "Без названия",
+            titleArabic: ch.titleArabic,
+            hadiths: Array.isArray(ch.hadiths)
+              ? ch.hadiths.map((h, hi) => ({
+                  id: h.id ?? generateId(),
+                  number: typeof h.number === "number" ? h.number : hi + 1,
+                  arabic: h.arabic ?? "",
+                  translation: h.translation ?? "",
+                  narrator: h.narrator,
+                }))
+              : [],
+          }))
+        : [],
+      ayahs: Array.isArray(b.ayahs)
+        ? (b.ayahs as CustomAyah[]).map((a, ai) => ({
+            id: a.id ?? generateId(),
+            number: typeof a.number === "number" ? a.number : ai + 1,
+            arabic: a.arabic ?? "",
+            translation: a.translation ?? "",
+          }))
+        : [],
+    };
+    onImport(book);
+    imported++;
+  }
+  return imported;
+}
+
 function useFileUpload(onImport: (book: CustomBook) => void) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1295,77 +1367,56 @@ function useFileUpload(onImport: (book: CustomBook) => void) {
     // Reset input so the same file can be re-uploaded if needed
     e.target.value = "";
 
-    if (!file.name.endsWith(".json")) {
-      toast.error("Пожалуйста, загрузите файл в формате JSON");
+    const isJson = file.name.endsWith(".json");
+    const isZip = file.name.endsWith(".zip") || file.type === "application/zip";
+
+    if (!isJson && !isZip) {
+      toast.error("Пожалуйста, загрузите файл в формате JSON или ZIP");
       return;
     }
 
     setLoading(true);
+
+    if (isZip) {
+      // Handle ZIP archive containing JSON files
+      JSZip.loadAsync(file)
+        .then(async (zip) => {
+          const jsonFiles = Object.values(zip.files).filter(
+            (f) => !f.dir && f.name.endsWith(".json"),
+          );
+          if (jsonFiles.length === 0) {
+            toast.error("ZIP архив не содержит JSON файлов");
+            return;
+          }
+          let totalImported = 0;
+          for (const jsonFile of jsonFiles) {
+            try {
+              const text = await jsonFile.async("text");
+              const parsed = JSON.parse(text);
+              const baseName = jsonFile.name.split("/").pop() ?? jsonFile.name;
+              totalImported += parseBookJson(parsed, onImport, baseName);
+            } catch {
+              toast.error(`Ошибка в файле ${jsonFile.name}`);
+            }
+          }
+          if (totalImported > 0) {
+            toast.success(`Загружено книг из ZIP: ${totalImported}`);
+          }
+        })
+        .catch(() => {
+          toast.error("Не удалось открыть ZIP архив");
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    // Handle plain JSON
     const reader = new FileReader();
+    const jsonFileName = file.name;
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
-
-        // Support both a single book object and an array of books
-        const raw: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-
-        let imported = 0;
-        for (const item of raw) {
-          const b = item as Partial<CustomBook>;
-          if (!b.title || typeof b.title !== "string") {
-            toast.error(`Пропущена книга без поля "title"`);
-            continue;
-          }
-          const book: CustomBook = {
-            id: generateId(),
-            title: b.title.trim(),
-            titleArabic:
-              typeof b.titleArabic === "string"
-                ? b.titleArabic.trim() || undefined
-                : undefined,
-            description:
-              typeof b.description === "string"
-                ? b.description.trim() || undefined
-                : undefined,
-            coverColor:
-              typeof b.coverColor === "string"
-                ? b.coverColor
-                : COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)],
-            type: (["hadith", "quran_surah", "general"] as const).includes(
-              b.type as "hadith",
-            )
-              ? (b.type as CustomBook["type"])
-              : "general",
-            chapters: Array.isArray(b.chapters)
-              ? (b.chapters as CustomChapter[]).map((ch) => ({
-                  id: ch.id ?? generateId(),
-                  title: ch.title ?? "Без названия",
-                  titleArabic: ch.titleArabic,
-                  hadiths: Array.isArray(ch.hadiths)
-                    ? ch.hadiths.map((h, hi) => ({
-                        id: h.id ?? generateId(),
-                        number:
-                          typeof h.number === "number" ? h.number : hi + 1,
-                        arabic: h.arabic ?? "",
-                        translation: h.translation ?? "",
-                        narrator: h.narrator,
-                      }))
-                    : [],
-                }))
-              : [],
-            ayahs: Array.isArray(b.ayahs)
-              ? (b.ayahs as CustomAyah[]).map((a, ai) => ({
-                  id: a.id ?? generateId(),
-                  number: typeof a.number === "number" ? a.number : ai + 1,
-                  arabic: a.arabic ?? "",
-                  translation: a.translation ?? "",
-                }))
-              : [],
-          };
-          onImport(book);
-          imported++;
-        }
-
+        const imported = parseBookJson(parsed, onImport, jsonFileName);
         if (imported > 0) {
           toast.success(`Загружено книг: ${imported}`);
         }
@@ -1388,7 +1439,7 @@ function useFileUpload(onImport: (book: CustomBook) => void) {
     <input
       ref={inputRef}
       type="file"
-      accept=".json,application/json"
+      accept=".json,.zip,application/json,application/zip"
       className="hidden"
       onChange={handleChange}
       data-ocid="admin.books.upload_button"
@@ -1450,7 +1501,7 @@ function FormatHintDialog({
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-islamic-500/10">
               <h3 className="font-bold text-sm text-foreground">
-                Формат JSON-файла
+                Формат файла (JSON / ZIP)
               </h3>
               <button
                 type="button"
@@ -1464,8 +1515,10 @@ function FormatHintDialog({
             <div className="px-4 py-3 space-y-3 max-h-[70vh] overflow-y-auto">
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Загрузите файл{" "}
-                <span className="text-islamic-400 font-semibold">.json</span> с
-                одной книгой или массивом книг. Доступные типы книги:
+                <span className="text-islamic-400 font-semibold">.json</span>{" "}
+                или <span className="text-islamic-400 font-semibold">.zip</span>{" "}
+                (архив с JSON-файлами) с одной книгой или массивом книг.
+                Доступные типы книги:
               </p>
               <div className="flex flex-wrap gap-2">
                 {(["hadith", "quran_surah", "general"] as const).map((t) => (
