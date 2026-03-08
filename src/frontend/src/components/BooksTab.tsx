@@ -1,12 +1,23 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, BookOpen, Search } from "lucide-react";
+import { ArrowLeft, BookOpen, BookText, Loader2, Search } from "lucide-react";
+import { AnimatePresence } from "motion/react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  type IslamHouseBook,
+  type IslamHouseBookMeta,
+  getIslamHouseBookById,
+  getIslamHouseBooksMeta,
+  saveIslamHouseBooksAsync,
+} from "../data/islamhouseBooks";
+import { quranFullText } from "../data/quranFullText";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
-import { type LangCode, tr, useLanguage } from "../hooks/useLanguage";
+import { tr, useLanguage } from "../hooks/useLanguage";
 import { playBookOpen } from "../utils/sounds";
-import { type CustomBook, getCustomBooks } from "./AdminBooksEditor";
+import type { CustomBook } from "./AdminBooksEditor";
+import { IslamHouseFileViewer } from "./IslamHouseBooksManager";
 
 // ─────────────────────────────────────────────
 // Types
@@ -33,237 +44,56 @@ interface BukhariChapter {
 }
 
 // ─────────────────────────────────────────────
-// Quran full-text ayahs (same as before)
+// Quran full-text ayahs — built from quranFullText data (complete surahs only)
 // ─────────────────────────────────────────────
-const surahTexts: Record<number, Ayah[]> = {
-  1: [
-    {
-      number: 1,
-      arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-      translation: "Во имя Аллаха, Милостивого, Милосердного!",
-    },
-    {
-      number: 2,
-      arabic: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
-      translation: "Хвала Аллаху, Господу миров,",
-    },
-    {
-      number: 3,
-      arabic: "الرَّحْمَٰنِ الرَّحِيمِ",
-      translation: "Милостивому, Милосердному,",
-    },
-    {
-      number: 4,
-      arabic: "مَالِكِ يَوْمِ الدِّينِ",
-      translation: "Владыке Дня воздаяния!",
-    },
-    {
-      number: 5,
-      arabic: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-      translation: "Тебе одному мы поклоняемся и Тебя одного молим о помощи.",
-    },
-    {
-      number: 6,
-      arabic: "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
-      translation: "Веди нас прямым путём,",
-    },
-    {
-      number: 7,
-      arabic: "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
-      translation:
-        "путём тех, кого Ты облагодетельствовал, не тех, на кого Ты разгневался, и не заблудших.",
-    },
-  ],
-  112: [
-    {
-      number: 1,
-      arabic: "قُلْ هُوَ اللَّهُ أَحَدٌ",
-      translation: "Скажи: «Он — Аллах Единый,",
-    },
-    { number: 2, arabic: "اللَّهُ الصَّمَدُ", translation: "Аллах Вечный." },
-    {
-      number: 3,
-      arabic: "لَمْ يَلِدْ وَلَمْ يُولَدْ",
-      translation: "Он не родил и не был рождён,",
-    },
-    {
-      number: 4,
-      arabic: "وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
-      translation: "и нет никого равного Ему».",
-    },
-  ],
-  113: [
-    {
-      number: 1,
-      arabic: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
-      translation: "Скажи: «Прибегаю к защите Господа рассвета",
-    },
-    {
-      number: 2,
-      arabic: "مِن شَرِّ مَا خَلَقَ",
-      translation: "от зла того, что Он сотворил,",
-    },
-    {
-      number: 3,
-      arabic: "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
-      translation: "от зла мрака, когда он наступает,",
-    },
-    {
-      number: 4,
-      arabic: "وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ",
-      translation: "от зла колдуний, дующих на узлы,",
-    },
-    {
-      number: 5,
-      arabic: "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
-      translation: "от зла завистника, когда он завидует».",
-    },
-  ],
-  114: [
-    {
-      number: 1,
-      arabic: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
-      translation: "Скажи: «Прибегаю к защите Господа людей,",
-    },
-    { number: 2, arabic: "مَلِكِ النَّاسِ", translation: "Царя людей," },
-    { number: 3, arabic: "إِلَٰهِ النَّاسِ", translation: "Бога людей," },
-    {
-      number: 4,
-      arabic: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ",
-      translation: "от зла искусителя исчезающего,",
-    },
-    {
-      number: 5,
-      arabic: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ",
-      translation: "который нашёптывает в груди людей,",
-    },
-    {
-      number: 6,
-      arabic: "مِنَ الْجِنَّةِ وَالنَّاسِ",
-      translation: "будь то джинны или люди».",
-    },
-  ],
-};
+const localCompleteAyahsBooks: Record<number, Ayah[]> = {};
+for (const surah of quranFullText) {
+  const meta = quranSurahs.find((s) => s.number === surah.number);
+  if (meta && surah.ayahs.length === meta.verses) {
+    localCompleteAyahsBooks[surah.number] = surah.ayahs.map((a) => ({
+      number: a.n,
+      arabic: a.ar,
+      translation: a.ru,
+    }));
+  }
+}
 
-// ─────────────────────────────────────────────
-// Multi-language ayah translations (for surahs with full text)
-// ─────────────────────────────────────────────
-type AyahTranslations = Record<
-  number,
-  Record<number, Partial<Record<LangCode, string>>>
->;
-
-const surahTranslations: AyahTranslations = {
-  1: {
-    1: {
-      en: "In the name of Allah, the Entirely Merciful, the Especially Merciful.",
-      ar: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-    },
-    2: {
-      en: "[All] praise is [due] to Allah, Lord of the worlds.",
-      ar: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
-    },
-    3: {
-      en: "The Entirely Merciful, the Especially Merciful.",
-      ar: "الرَّحْمَٰنِ الرَّحِيمِ",
-    },
-    4: {
-      en: "Sovereign of the Day of Recompense.",
-      ar: "مَالِكِ يَوْمِ الدِّينِ",
-    },
-    5: {
-      en: "It is You we worship and You we ask for help.",
-      ar: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-    },
-    6: {
-      en: "Guide us to the straight path.",
-      ar: "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
-    },
-    7: {
-      en: "The path of those upon whom You have bestowed favor, not of those who have evoked [Your] anger or of those who are astray.",
-      ar: "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
-    },
-  },
-  112: {
-    1: {
-      en: "Say: He is Allah, [who is] One.",
-      ar: "قُلْ هُوَ اللَّهُ أَحَدٌ",
-    },
-    2: {
-      en: "Allah, the Eternal Refuge.",
-      ar: "اللَّهُ الصَّمَدُ",
-    },
-    3: {
-      en: "He neither begets nor is born.",
-      ar: "لَمْ يَلِدْ وَلَمْ يُولَدْ",
-    },
-    4: {
-      en: "Nor is there to Him any equivalent.",
-      ar: "وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
-    },
-  },
-  113: {
-    1: {
-      en: "Say: I seek refuge in the Lord of daybreak.",
-      ar: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
-    },
-    2: {
-      en: "From the evil of what He has created.",
-      ar: "مِن شَرِّ مَا خَلَقَ",
-    },
-    3: {
-      en: "And from the evil of darkness when it settles.",
-      ar: "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
-    },
-    4: {
-      en: "And from the evil of the blowers in knots.",
-      ar: "وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ",
-    },
-    5: {
-      en: "And from the evil of an envier when he envies.",
-      ar: "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
-    },
-  },
-  114: {
-    1: {
-      en: "Say: I seek refuge in the Lord of mankind.",
-      ar: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
-    },
-    2: {
-      en: "The Sovereign of mankind.",
-      ar: "مَلِكِ النَّاسِ",
-    },
-    3: {
-      en: "The God of mankind.",
-      ar: "إِلَٰهِ النَّاسِ",
-    },
-    4: {
-      en: "From the evil of the retreating whisperer.",
-      ar: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ",
-    },
-    5: {
-      en: "Who whispers in the breasts of mankind.",
-      ar: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ",
-    },
-    6: {
-      en: "Of jinn and mankind.",
-      ar: "مِنَ الْجِنَّةِ وَالنَّاسِ",
-    },
-  },
-};
-
-function getAyahTranslation(
-  surahNum: number,
-  ayahNum: number,
-  lang: LangCode,
-): string | null {
-  // Arabic — no translation shown
-  if (lang === "ar") return null;
-  const surah = surahTranslations[surahNum];
-  if (!surah) return lang === "en" ? null : "";
-  const ayah = surah[ayahNum];
-  if (!ayah) return lang === "en" ? null : "";
-  return ayah[lang] || null;
+// Persistent cache helpers (shared with QuranTab)
+const QURAN_CACHE_KEY = "quran_surah_";
+function getBooksCachedSurah(number: number): Ayah[] | null {
+  try {
+    const raw = localStorage.getItem(`${QURAN_CACHE_KEY}${number}`);
+    if (raw) return JSON.parse(raw) as Ayah[];
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+function setBooksCachedSurah(number: number, ayahs: Ayah[]) {
+  try {
+    localStorage.setItem(`${QURAN_CACHE_KEY}${number}`, JSON.stringify(ayahs));
+  } catch {
+    /* ignore */
+  }
+}
+async function fetchSurahForBooks(number: number): Promise<Ayah[]> {
+  const [arRes, ruRes] = await Promise.all([
+    fetch(`https://api.alquran.cloud/v1/surah/${number}`),
+    fetch(`https://api.alquran.cloud/v1/surah/${number}/ru.kuliev`),
+  ]);
+  if (!arRes.ok || !ruRes.ok) throw new Error("API failed");
+  const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
+  const arAyahs: { numberInSurah: number; text: string }[] =
+    arData?.data?.ayahs ?? [];
+  const ruAyahs: { numberInSurah: number; text: string }[] =
+    ruData?.data?.ayahs ?? [];
+  const ruMap: Record<number, string> = {};
+  for (const a of ruAyahs) ruMap[a.numberInSurah] = a.text;
+  return arAyahs.map((a) => ({
+    number: a.numberInSurah,
+    arabic: a.text,
+    translation: ruMap[a.numberInSurah] ?? "",
+  }));
 }
 
 // ─────────────────────────────────────────────
@@ -587,15 +417,66 @@ function AyahMedallion({ number }: { number: number }) {
 }
 
 // ─────────────────────────────────────────────
-// Quran reading view
+// Quran reading view (with API fetch for full text)
 // ─────────────────────────────────────────────
 function SurahReadingView({
   surah,
   onBack,
 }: { surah: Surah; onBack: () => void }) {
   const lang = useLanguage();
-  const ayahs = surahTexts[surah.number];
-  const hasFullText = !!ayahs;
+  const [ayahs, setAyahs] = useState<Ayah[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      // 1. Complete local data
+      if (localCompleteAyahsBooks[surah.number]) {
+        setAyahs(localCompleteAyahsBooks[surah.number]);
+        return;
+      }
+      // 2. Cache
+      const cached = getBooksCachedSurah(surah.number);
+      if (cached && cached.length === surah.verses) {
+        setAyahs(cached);
+        return;
+      }
+      // 3. API
+      setLoading(true);
+      setError(null);
+      try {
+        const fetched = await fetchSurahForBooks(surah.number);
+        if (!cancelled) {
+          setAyahs(fetched);
+          setBooksCachedSurah(surah.number, fetched);
+        }
+      } catch {
+        if (!cancelled) {
+          const partial = quranFullText.find((s) => s.number === surah.number);
+          if (partial && partial.ayahs.length > 0) {
+            setAyahs(
+              partial.ayahs.map((a) => ({
+                number: a.n,
+                arabic: a.ar,
+                translation: a.ru,
+              })),
+            );
+          } else {
+            setError(
+              "Не удалось загрузить текст суры. Проверьте подключение к интернету.",
+            );
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [surah.number, surah.verses]);
 
   return (
     <div
@@ -624,6 +505,11 @@ function SurahReadingView({
           <div className="text-xs font-semibold" style={{ color: "#2e7d32" }}>
             {surah.number}. {surah.nameRu}
           </div>
+          {ayahs && (
+            <div className="text-[10px]" style={{ color: "#4caf50" }}>
+              {ayahs.length} аятов
+            </div>
+          )}
         </div>
         <div className="w-16" />
       </div>
@@ -659,7 +545,45 @@ function SurahReadingView({
             {surah.verses} аятов
           </span>
         </div>
-        {hasFullText ? (
+
+        {/* Loading */}
+        {loading && (
+          <div
+            className="flex flex-col items-center justify-center py-16 gap-4"
+            data-ocid="quran.reading.loading_state"
+          >
+            <Loader2
+              size={32}
+              className="animate-spin"
+              style={{ color: "#4caf50" }}
+            />
+            <p className="text-sm" style={{ color: "#4caf50" }}>
+              Загрузка текста суры...
+            </p>
+            <p className="text-xs text-center" style={{ color: "#888" }}>
+              Источник: api.alquran.cloud
+            </p>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && (
+          <div
+            className="rounded-2xl p-5 text-center"
+            style={{
+              background: "rgba(244,67,54,0.07)",
+              border: "1px solid rgba(244,67,54,0.2)",
+            }}
+            data-ocid="quran.reading.error_state"
+          >
+            <p className="text-sm" style={{ color: "#c62828" }}>
+              {error}
+            </p>
+          </div>
+        )}
+
+        {/* Ayahs */}
+        {ayahs && !loading && (
           <div className="space-y-0">
             {ayahs.map((ayah, idx) => (
               <div
@@ -692,81 +616,25 @@ function SurahReadingView({
                     <AyahMedallion number={ayah.number} />
                   </div>
                 </div>
-                {lang !== "ar" &&
-                  (() => {
-                    const translation =
-                      lang === "ru"
-                        ? ayah.translation
-                        : (getAyahTranslation(
-                            surah.number,
-                            ayah.number,
-                            lang,
-                          ) ?? ayah.translation);
-                    return (
-                      <p
-                        className="text-sm leading-relaxed mt-1"
-                        style={{ color: "#5a5a5a", lineHeight: "1.7" }}
-                      >
-                        <span
-                          style={{
-                            color: "#4caf50",
-                            fontWeight: 600,
-                            marginRight: "4px",
-                          }}
-                        >
-                          {ayah.number}.
-                        </span>
-                        {translation}
-                      </p>
-                    );
-                  })()}
+                {lang !== "ar" && ayah.translation && (
+                  <p
+                    className="text-sm leading-relaxed mt-1"
+                    style={{ color: "#5a5a5a", lineHeight: "1.7" }}
+                  >
+                    <span
+                      style={{
+                        color: "#4caf50",
+                        fontWeight: 600,
+                        marginRight: "4px",
+                      }}
+                    >
+                      {ayah.number}.
+                    </span>
+                    {ayah.translation}
+                  </p>
+                )}
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div
-              className="rounded-2xl p-5"
-              style={{
-                background: "rgba(76,175,80,0.07)",
-                border: "1px solid rgba(76,175,80,0.2)",
-              }}
-            >
-              <div
-                className="text-xs font-semibold uppercase tracking-widest mb-3"
-                style={{ color: "#4caf50" }}
-              >
-                О суре
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: "#333" }}>
-                {surah.descriptionRu}
-              </p>
-            </div>
-            <div
-              className="text-center py-8"
-              style={{
-                fontFamily: "serif",
-                direction: "rtl",
-                fontSize: "3rem",
-                color: "#1a3c1a",
-              }}
-            >
-              {surah.arabic}
-            </div>
-            <div
-              className="text-center text-sm rounded-2xl py-4 px-5"
-              style={{
-                background: "rgba(76,175,80,0.07)",
-                border: "1px dashed rgba(76,175,80,0.3)",
-                color: "#666",
-              }}
-            >
-              Полный текст этой суры содержит {surah.verses} аятов.
-              <br />
-              <span style={{ color: "#4caf50" }}>
-                Скоро будет добавлен полный текст.
-              </span>
-            </div>
           </div>
         )}
       </div>
@@ -3472,6 +3340,58 @@ function CustomBookView({
   );
 }
 
+// ─────────────────────────────────────────────
+// PDF Book View
+// ─────────────────────────────────────────────
+function PdfBookView({
+  book,
+  onBack,
+}: {
+  book: import("./AdminBooksEditor").CustomBook;
+  onBack: () => void;
+}) {
+  const lang = useLanguage();
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 glass-card border-b border-islamic-500/10">
+        <button
+          type="button"
+          className="flex items-center gap-2 text-sm font-medium text-islamic-400"
+          onClick={onBack}
+          data-ocid="pdf.book.back_button"
+        >
+          <ArrowLeft size={18} />
+          <span>{tr("guide.back", lang)}</span>
+        </button>
+        <div className="text-center">
+          <div className="text-sm font-bold text-foreground truncate max-w-[180px]">
+            {book.title}
+          </div>
+        </div>
+        <div className="w-16" />
+      </div>
+      <div
+        className="flex-1 relative"
+        style={{ minHeight: "calc(100vh - 60px)" }}
+      >
+        {book.pdfDataUrl ? (
+          <iframe
+            src={book.pdfDataUrl}
+            title={book.title}
+            className="w-full h-full border-none"
+            style={{ minHeight: "calc(100vh - 60px)" }}
+            data-ocid="pdf.book.canvas_target"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full py-24 text-muted-foreground text-sm">
+            PDF файл недоступен
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 type BookView =
   | "shelf"
   | "quran"
@@ -3486,13 +3406,60 @@ type BookView =
   | "muslima"
   | "time"
   | "encyclopedia"
-  | "custom";
+  | "custom"
+  | "pdf";
 
 export default function BooksTab() {
   const [view, setView] = useState<BookView>("shelf");
   const [selectedCustomBook, setSelectedCustomBook] =
     useState<CustomBook | null>(null);
-  const customBooks = getCustomBooks();
+  // IslamHouse books — lightweight meta only
+  const [islamHouseBooks, setIslamHouseBooks] = useState<IslamHouseBookMeta[]>(
+    () => getIslamHouseBooksMeta(),
+  );
+  const [selectedFile, setSelectedFile] = useState<{
+    dataUrl: string;
+    name: string;
+  } | null>(null);
+  // Track which book is currently loading its file
+  const [loadingFileId, setLoadingFileId] = useState<string | null>(null);
+
+  // Migrate old localStorage books to IndexedDB (one-time)
+  useEffect(() => {
+    const migrateOldBooks = async () => {
+      try {
+        const raw = localStorage.getItem("islamhouse_books");
+        if (!raw) return;
+        const oldBooks = JSON.parse(raw) as IslamHouseBook[];
+        if (oldBooks.length > 0) {
+          const validBooks = oldBooks.filter(
+            (b) =>
+              b.fileAr !== "[file_too_large]" &&
+              b.fileRu !== "[file_too_large]",
+          );
+          if (validBooks.length > 0) {
+            await saveIslamHouseBooksAsync(validBooks);
+          }
+          localStorage.removeItem("islamhouse_books");
+          setIslamHouseBooks(getIslamHouseBooksMeta());
+        }
+      } catch {
+        /* ignore migration errors */
+      }
+    };
+    void migrateOldBooks();
+  }, []);
+
+  // Refresh IslamHouse books when they are updated in the same tab or another tab
+  useEffect(() => {
+    const refresh = () => setIslamHouseBooks(getIslamHouseBooksMeta());
+    window.addEventListener("storage", refresh);
+    window.addEventListener("islamhouse-books-updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("islamhouse-books-updated", refresh);
+    };
+  }, []);
 
   if (view === "quran")
     return <QuranBookView onBack={() => setView("shelf")} />;
@@ -3591,6 +3558,17 @@ export default function BooksTab() {
   if (view === "encyclopedia")
     return <EncyclopediaView onBack={() => setView("shelf")} />;
 
+  if (view === "pdf" && selectedCustomBook)
+    return (
+      <PdfBookView
+        book={selectedCustomBook}
+        onBack={() => {
+          setView("shelf");
+          setSelectedCustomBook(null);
+        }}
+      />
+    );
+
   if (view === "custom" && selectedCustomBook)
     return (
       <CustomBookView
@@ -3603,699 +3581,768 @@ export default function BooksTab() {
     );
 
   return (
-    <div className="flex flex-col px-4 py-4" data-ocid="books.shelf.panel">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <BookOpen size={16} className="text-islamic-500" />
-          <h2 className="text-xl font-display font-bold text-gradient-orange">
-            Исламские Книги
-          </h2>
-          <BookOpen size={16} className="text-islamic-500" />
+    <>
+      {/* IslamHouse file viewer overlay */}
+      <AnimatePresence>
+        {selectedFile && (
+          <IslamHouseFileViewer
+            file={selectedFile.dataUrl}
+            name={selectedFile.name}
+            onClose={() => setSelectedFile(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="flex flex-col px-4 py-4" data-ocid="books.shelf.panel">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <BookOpen size={16} className="text-islamic-500" />
+            <h2 className="text-xl font-display font-bold text-gradient-orange">
+              Исламские Книги
+            </h2>
+            <BookOpen size={16} className="text-islamic-500" />
+          </div>
+          <p className="text-foreground/40 text-xs">
+            Коран и достоверные исламские источники
+          </p>
         </div>
-        <p className="text-foreground/40 text-xs">
-          Коран и достоверные исламские источники
-        </p>
-      </div>
 
-      {/* Book cards */}
-      <div className="space-y-4">
-        {/* Quran */}
-        <button
-          type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
-          style={{
-            border: "1px solid rgba(76,175,80,0.3)",
-            boxShadow: "0 4px 20px rgba(76,175,80,0.1)",
-          }}
-          onClick={() => {
-            playBookOpen();
-            setView("quran");
-          }}
-          data-ocid="books.quran.button"
-        >
-          {/* Cover gradient */}
-          <div
-            className="px-5 py-5 flex items-center gap-4"
+        {/* Book cards */}
+        <div className="space-y-4">
+          {/* Quran */}
+          <button
+            type="button"
+            className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
             style={{
-              background:
-                "linear-gradient(135deg, #1a3c1a 0%, #2e7d32 50%, #388e3c 100%)",
+              border: "1px solid rgba(76,175,80,0.3)",
+              boxShadow: "0 4px 20px rgba(76,175,80,0.1)",
             }}
+            onClick={() => {
+              playBookOpen();
+              setView("quran");
+            }}
+            data-ocid="books.quran.button"
           >
+            {/* Cover gradient */}
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+              className="px-5 py-5 flex items-center gap-4"
               style={{
-                background: "rgba(255,255,255,0.12)",
-                border: "1px solid rgba(255,255,255,0.2)",
+                background:
+                  "linear-gradient(135deg, #1a3c1a 0%, #2e7d32 50%, #388e3c 100%)",
               }}
-            >
-              <span
-                style={{
-                  fontFamily: "serif",
-                  fontSize: "1.6rem",
-                  color: "#fff",
-                }}
-              >
-                قرآن
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="text-white font-bold text-lg leading-tight">
-                Священный Коран
-              </div>
-              <div className="text-green-200/70 text-xs mt-0.5">
-                القرآن الكريم
-              </div>
-              <div className="mt-2 flex gap-2">
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#c8f7c5",
-                  }}
-                >
-                  114 сур
-                </span>
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#c8f7c5",
-                  }}
-                >
-                  Арабский · Русский
-                </span>
-              </div>
-            </div>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </div>
-          <div
-            className="px-5 py-3"
-            style={{
-              background: "rgba(76,175,80,0.06)",
-              borderTop: "1px solid rgba(76,175,80,0.15)",
-            }}
-          >
-            <p className="text-xs" style={{ color: "#5a5a5a" }}>
-              Все 114 сур на арабском языке с переводом на русский.
-            </p>
-          </div>
-        </button>
-
-        {/* Bukhari */}
-        <button
-          type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
-          style={{
-            border: "1px solid rgba(180,130,40,0.3)",
-            boxShadow: "0 4px 20px rgba(180,130,40,0.08)",
-          }}
-          onClick={() => {
-            playBookOpen();
-            setView("bukhari");
-          }}
-          data-ocid="books.bukhari.button"
-        >
-          <div
-            className="px-5 py-5 flex items-center gap-4"
-            style={{
-              background:
-                "linear-gradient(135deg, #3d2b00 0%, #7b5c10 50%, #a07820 100%)",
-            }}
-          >
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
-              style={{
-                background: "rgba(255,255,255,0.10)",
-                border: "1px solid rgba(255,255,255,0.18)",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "serif",
-                  fontSize: "1.1rem",
-                  color: "#fff",
-                  direction: "rtl",
-                  lineHeight: "1.3",
-                }}
-              >
-                صحيح
-                <br />
-                البخاري
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="text-white font-bold text-lg leading-tight">
-                Сахих аль-Бухари
-              </div>
-              <div className="text-yellow-200/70 text-xs mt-0.5">
-                صحيح البخاري
-              </div>
-              <div className="mt-2 flex gap-2">
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#fef3c7",
-                  }}
-                >
-                  {bukhariChapters.length} книг
-                </span>
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#fef3c7",
-                  }}
-                >
-                  Достоверные хадисы
-                </span>
-              </div>
-            </div>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </div>
-          <div
-            className="px-5 py-3"
-            style={{
-              background: "rgba(180,130,40,0.05)",
-              borderTop: "1px solid rgba(180,130,40,0.15)",
-            }}
-          >
-            <p className="text-xs" style={{ color: "#5a5a5a" }}>
-              Сборник имама аль-Бухари — один из наиболее достоверных сборников
-              хадисов Пророка ﷺ. Хадисы на арабском с переводом.
-            </p>
-          </div>
-        </button>
-
-        {/* 40 хадисов ан-Навави */}
-        <button
-          type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
-          style={{
-            border: "1px solid rgba(100,60,160,0.3)",
-            boxShadow: "0 4px 20px rgba(100,60,160,0.08)",
-          }}
-          onClick={() => {
-            playBookOpen();
-            setView("nawawi");
-          }}
-          data-ocid="books.nawawi.button"
-        >
-          <div
-            className="px-5 py-5 flex items-center gap-4"
-            style={{
-              background:
-                "linear-gradient(135deg, #2d1254 0%, #5b2d8e 50%, #7c3aed 100%)",
-            }}
-          >
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
-              style={{
-                background: "rgba(255,255,255,0.10)",
-                border: "1px solid rgba(255,255,255,0.18)",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "serif",
-                  fontSize: "1.1rem",
-                  color: "#fff",
-                  direction: "rtl",
-                  lineHeight: "1.3",
-                }}
-              >
-                ٤٠
-                <br />
-                حديث
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="text-white font-bold text-lg leading-tight">
-                40 хадисов ан-Навави
-              </div>
-              <div className="text-purple-200/70 text-xs mt-0.5">
-                الأربعون النووية
-              </div>
-              <div className="mt-2 flex gap-2">
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#e9d5ff",
-                  }}
-                >
-                  40 хадисов
-                </span>
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#e9d5ff",
-                  }}
-                >
-                  Основы ислама
-                </span>
-              </div>
-            </div>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </div>
-          <div
-            className="px-5 py-3"
-            style={{
-              background: "rgba(100,60,160,0.05)",
-              borderTop: "1px solid rgba(100,60,160,0.15)",
-            }}
-          >
-            <p className="text-xs" style={{ color: "#5a5a5a" }}>
-              Имам ан-Навави — 40 важнейших хадисов, охватывающих основы веры,
-              нравственности и богослужения.
-            </p>
-          </div>
-        </button>
-
-        {/* Рияд ас-Салихин */}
-        <button
-          type="button"
-          className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
-          style={{
-            border: "1px solid rgba(20,120,60,0.3)",
-            boxShadow: "0 4px 20px rgba(20,120,60,0.08)",
-          }}
-          onClick={() => {
-            playBookOpen();
-            setView("riyad");
-          }}
-          data-ocid="books.riyad.button"
-        >
-          <div
-            className="px-5 py-5 flex items-center gap-4"
-            style={{
-              background:
-                "linear-gradient(135deg, #0d3d20 0%, #145a32 50%, #1e7e34 100%)",
-            }}
-          >
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
-              style={{
-                background: "rgba(255,255,255,0.10)",
-                border: "1px solid rgba(255,255,255,0.18)",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "serif",
-                  fontSize: "1.1rem",
-                  color: "#fff",
-                  direction: "rtl",
-                  lineHeight: "1.3",
-                }}
-              >
-                رياض
-                <br />
-                الصالحين
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="text-white font-bold text-lg leading-tight">
-                Рияд ас-Салихин
-              </div>
-              <div className="text-green-200/70 text-xs mt-0.5">
-                رياض الصالحين
-              </div>
-              <div className="mt-2 flex gap-2">
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#d1fae5",
-                  }}
-                >
-                  6 разделов
-                </span>
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#d1fae5",
-                  }}
-                >
-                  Сады праведников
-                </span>
-              </div>
-            </div>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </div>
-          <div
-            className="px-5 py-3"
-            style={{
-              background: "rgba(20,120,60,0.05)",
-              borderTop: "1px solid rgba(20,120,60,0.15)",
-            }}
-          >
-            <p className="text-xs" style={{ color: "#5a5a5a" }}>
-              Имам ан-Навави — «Сады праведников». Один из наиболее читаемых
-              сборников хадисов, охватывающий все сферы жизни мусульманина.
-            </p>
-          </div>
-        </button>
-
-        {/* Book 5: 101 хадис */}
-        {renderBookCard({
-          viewId: "bukhari101",
-          gradient:
-            "linear-gradient(135deg, #072b36 0%, #0e7490 50%, #0891b2 100%)",
-          borderColor: "rgba(14,116,144,0.3)",
-          shadowColor: "rgba(14,116,144,0.08)",
-          arabicSymbol: "١٠١",
-          arabicSymbolStyle: { fontSize: "1.6rem" },
-          titleRu: "101 Хадис из Бухари",
-          titleAr: "مائة حديث نبوي",
-          titleColor: "text-cyan-200/70",
-          badge1: "101 хадис",
-          badge2: "Избранные",
-          badgeColor: "#cffafe",
-          description:
-            "Избранные 101 хадис из Сахих аль-Бухари по важнейшим темам: намерение, терпение, семья, соседи, знание.",
-          ocid: "books.bukhari101.button",
-          setView,
-        })}
-
-        {/* Book 6: Болезни нафса */}
-        {renderBookCard({
-          viewId: "nafs",
-          gradient:
-            "linear-gradient(135deg, #3f0a0a 0%, #7f1d1d 50%, #991b1b 100%)",
-          borderColor: "rgba(127,29,29,0.3)",
-          shadowColor: "rgba(127,29,29,0.08)",
-          arabicSymbol: "نفس",
-          arabicSymbolStyle: { fontSize: "1.4rem" },
-          titleRu: "Болезни нафса",
-          titleAr: "أمراض النفس وعلاجها",
-          titleColor: "text-red-200/70",
-          badge1: "5 болезней",
-          badge2: "Пути исцеления",
-          badgeColor: "#fecaca",
-          description:
-            "Гордыня, зависть, гнев, жадность и показуха — духовные болезни сердца и их исцеление.",
-          ocid: "books.nafs.button",
-          setView,
-        })}
-
-        {/* Book 7: Признаки Судного дня */}
-        {renderBookCard({
-          viewId: "qiyama",
-          gradient:
-            "linear-gradient(135deg, #1e0735 0%, #3b0764 50%, #581c87 100%)",
-          borderColor: "rgba(88,28,135,0.3)",
-          shadowColor: "rgba(88,28,135,0.08)",
-          arabicSymbol: "ساعة",
-          arabicSymbolStyle: { fontSize: "1.2rem" },
-          titleRu: "Признаки Судного дня",
-          titleAr: "أشراط الساعة",
-          titleColor: "text-purple-200/70",
-          badge1: "Малые признаки",
-          badge2: "Большие признаки",
-          badgeColor: "#e9d5ff",
-          description:
-            "Малые и большие знамения конца света из достоверных хадисов.",
-          ocid: "books.qiyama.button",
-          setView,
-        })}
-
-        {/* Book 8: Возвращение к Аллаху */}
-        {renderBookCard({
-          viewId: "tawba",
-          gradient:
-            "linear-gradient(135deg, #0e123a 0%, #1e1b4b 50%, #3730a3 100%)",
-          borderColor: "rgba(55,48,163,0.3)",
-          shadowColor: "rgba(55,48,163,0.08)",
-          arabicSymbol: "توبة",
-          arabicSymbolStyle: { fontSize: "1.3rem" },
-          titleRu: "Возвращение к Аллаху",
-          titleAr: "الأوبة إلى الله",
-          titleColor: "text-indigo-200/70",
-          badge1: "Тавба",
-          badge2: "5 условий",
-          badgeColor: "#c7d2fe",
-          description:
-            "Смысл покаяния, его условия и пути возвращения к Аллаху через искреннее раскаяние.",
-          ocid: "books.tawba.button",
-          setView,
-        })}
-
-        {/* Book 9: Сохранение веры */}
-        {renderBookCard({
-          viewId: "iman",
-          gradient:
-            "linear-gradient(135deg, #02271e 0%, #064e3b 50%, #065f46 100%)",
-          borderColor: "rgba(6,95,70,0.3)",
-          shadowColor: "rgba(6,95,70,0.08)",
-          arabicSymbol: "إيمان",
-          arabicSymbolStyle: { fontSize: "1.2rem" },
-          titleRu: "Сохранение веры",
-          titleAr: "حفظ الإيمان",
-          titleColor: "text-emerald-200/70",
-          badge1: "Иман",
-          badge2: "5 разделов",
-          badgeColor: "#a7f3d0",
-          description:
-            "Что ослабляет и укрепляет иман. Роль намаза, зикра и добрых дел в сохранении веры.",
-          ocid: "books.iman.button",
-          setView,
-        })}
-
-        {/* Book 10: Путеводитель мусульманки */}
-        {renderBookCard({
-          viewId: "muslima",
-          gradient:
-            "linear-gradient(135deg, #400d25 0%, #831843 50%, #9d174d 100%)",
-          borderColor: "rgba(157,23,77,0.3)",
-          shadowColor: "rgba(157,23,77,0.08)",
-          arabicSymbol: "مسلمة",
-          arabicSymbolStyle: { fontSize: "1.1rem" },
-          titleRu: "Путеводитель мусульманки",
-          titleAr: "دليل المسلمة",
-          titleColor: "text-rose-200/70",
-          badge1: "Хиджаб · Семья",
-          badge2: "Дуа · Образцы",
-          badgeColor: "#fecdd3",
-          description:
-            "Хиджаб, права женщины, семья, дуа и великие женщины Ислама.",
-          ocid: "books.muslima.button",
-          setView,
-        })}
-
-        {/* Book 11: Ценность времени */}
-        {renderBookCard({
-          viewId: "time",
-          gradient:
-            "linear-gradient(135deg, #3d1a00 0%, #78350f 50%, #92400e 100%)",
-          borderColor: "rgba(146,64,14,0.3)",
-          shadowColor: "rgba(146,64,14,0.08)",
-          arabicSymbol: "وقت",
-          arabicSymbolStyle: { fontSize: "1.4rem" },
-          titleRu: "Ценность времени",
-          titleAr: "قيمة الوقت",
-          titleColor: "text-amber-200/70",
-          badge1: "Тайм-менеджмент",
-          badge2: "Сунна Пророка ﷺ",
-          badgeColor: "#fde68a",
-          description:
-            "Как мусульманину ценить время, планировать день и помнить об ответственности за него.",
-          ocid: "books.time.button",
-          setView,
-        })}
-
-        {/* Book 12: Энциклопедия */}
-        {renderBookCard({
-          viewId: "encyclopedia",
-          gradient:
-            "linear-gradient(135deg, #0a1629 0%, #1e3a5f 50%, #1e40af 100%)",
-          borderColor: "rgba(30,58,95,0.3)",
-          shadowColor: "rgba(30,58,95,0.08)",
-          arabicSymbol: "إسلام",
-          arabicSymbolStyle: { fontSize: "1.2rem" },
-          titleRu: "Расскажи мне об Исламе",
-          titleAr: "حدثني عن الإسلام",
-          titleColor: "text-blue-200/70",
-          badge1: "10 вопросов",
-          badge2: "Для начинающих",
-          badgeColor: "#bfdbfe",
-          description:
-            "Краткая энциклопедия для начинающих: ответы на 10 главных вопросов об Исламе.",
-          ocid: "books.encyclopedia.button",
-          setView,
-        })}
-      </div>
-
-      {/* ── Custom Books ── */}
-      {customBooks.length > 0 && (
-        <>
-          <div className="mt-6 mb-3 flex items-center gap-2">
-            <div className="h-px flex-1 bg-islamic-500/10" />
-            <span className="text-xs text-muted-foreground/50 font-medium px-2">
-              Добавленные книги
-            </span>
-            <div className="h-px flex-1 bg-islamic-500/10" />
-          </div>
-          {customBooks.map((book, idx) => (
-            <button
-              key={book.id}
-              type="button"
-              className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60 mb-4"
-              style={{
-                border: `1px solid ${book.coverColor}55`,
-                boxShadow: `0 4px 20px ${book.coverColor}18`,
-              }}
-              onClick={() => {
-                playBookOpen();
-                setSelectedCustomBook(book);
-                setView("custom");
-              }}
-              data-ocid={`books.custom.button.${idx + 1}`}
             >
               <div
-                className="px-5 py-5 flex items-center gap-4"
+                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
                 style={{
-                  background: `linear-gradient(135deg, ${book.coverColor} 0%, ${book.coverColor}cc 100%)`,
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.2)",
                 }}
               >
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+                <span
                   style={{
-                    background: "rgba(255,255,255,0.12)",
-                    border: "1px solid rgba(255,255,255,0.2)",
+                    fontFamily: "serif",
+                    fontSize: "1.6rem",
+                    color: "#fff",
                   }}
                 >
-                  <BookOpen size={20} className="text-white/80" />
+                  قرآن
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-bold text-lg leading-tight">
+                  Священный Коран
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-bold text-lg leading-tight truncate">
-                    {book.title}
+                <div className="text-green-200/70 text-xs mt-0.5">
+                  القرآن الكريم
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#c8f7c5",
+                    }}
+                  >
+                    114 сур
+                  </span>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#c8f7c5",
+                    }}
+                  >
+                    Арабский · Русский
+                  </span>
+                </div>
+              </div>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+            <div
+              className="px-5 py-3"
+              style={{
+                background: "rgba(76,175,80,0.06)",
+                borderTop: "1px solid rgba(76,175,80,0.15)",
+              }}
+            >
+              <p className="text-xs" style={{ color: "#5a5a5a" }}>
+                Все 114 сур на арабском языке с переводом на русский.
+              </p>
+            </div>
+          </button>
+
+          {/* Bukhari */}
+          <button
+            type="button"
+            className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
+            style={{
+              border: "1px solid rgba(180,130,40,0.3)",
+              boxShadow: "0 4px 20px rgba(180,130,40,0.08)",
+            }}
+            onClick={() => {
+              playBookOpen();
+              setView("bukhari");
+            }}
+            data-ocid="books.bukhari.button"
+          >
+            <div
+              className="px-5 py-5 flex items-center gap-4"
+              style={{
+                background:
+                  "linear-gradient(135deg, #3d2b00 0%, #7b5c10 50%, #a07820 100%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "serif",
+                    fontSize: "1.1rem",
+                    color: "#fff",
+                    direction: "rtl",
+                    lineHeight: "1.3",
+                  }}
+                >
+                  صحيح
+                  <br />
+                  البخاري
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-bold text-lg leading-tight">
+                  Сахих аль-Бухари
+                </div>
+                <div className="text-yellow-200/70 text-xs mt-0.5">
+                  صحيح البخاري
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#fef3c7",
+                    }}
+                  >
+                    {bukhariChapters.length} книг
+                  </span>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#fef3c7",
+                    }}
+                  >
+                    Достоверные хадисы
+                  </span>
+                </div>
+              </div>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+            <div
+              className="px-5 py-3"
+              style={{
+                background: "rgba(180,130,40,0.05)",
+                borderTop: "1px solid rgba(180,130,40,0.15)",
+              }}
+            >
+              <p className="text-xs" style={{ color: "#5a5a5a" }}>
+                Сборник имама аль-Бухари — один из наиболее достоверных
+                сборников хадисов Пророка ﷺ. Хадисы на арабском с переводом.
+              </p>
+            </div>
+          </button>
+
+          {/* 40 хадисов ан-Навави */}
+          <button
+            type="button"
+            className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
+            style={{
+              border: "1px solid rgba(100,60,160,0.3)",
+              boxShadow: "0 4px 20px rgba(100,60,160,0.08)",
+            }}
+            onClick={() => {
+              playBookOpen();
+              setView("nawawi");
+            }}
+            data-ocid="books.nawawi.button"
+          >
+            <div
+              className="px-5 py-5 flex items-center gap-4"
+              style={{
+                background:
+                  "linear-gradient(135deg, #2d1254 0%, #5b2d8e 50%, #7c3aed 100%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "serif",
+                    fontSize: "1.1rem",
+                    color: "#fff",
+                    direction: "rtl",
+                    lineHeight: "1.3",
+                  }}
+                >
+                  ٤٠
+                  <br />
+                  حديث
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-bold text-lg leading-tight">
+                  40 хадисов ан-Навави
+                </div>
+                <div className="text-purple-200/70 text-xs mt-0.5">
+                  الأربعون النووية
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#e9d5ff",
+                    }}
+                  >
+                    40 хадисов
+                  </span>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#e9d5ff",
+                    }}
+                  >
+                    Основы ислама
+                  </span>
+                </div>
+              </div>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+            <div
+              className="px-5 py-3"
+              style={{
+                background: "rgba(100,60,160,0.05)",
+                borderTop: "1px solid rgba(100,60,160,0.15)",
+              }}
+            >
+              <p className="text-xs" style={{ color: "#5a5a5a" }}>
+                Имам ан-Навави — 40 важнейших хадисов, охватывающих основы веры,
+                нравственности и богослужения.
+              </p>
+            </div>
+          </button>
+
+          {/* Рияд ас-Салихин */}
+          <button
+            type="button"
+            className="w-full rounded-2xl overflow-hidden text-left transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-islamic-500/60"
+            style={{
+              border: "1px solid rgba(20,120,60,0.3)",
+              boxShadow: "0 4px 20px rgba(20,120,60,0.08)",
+            }}
+            onClick={() => {
+              playBookOpen();
+              setView("riyad");
+            }}
+            data-ocid="books.riyad.button"
+          >
+            <div
+              className="px-5 py-5 flex items-center gap-4"
+              style={{
+                background:
+                  "linear-gradient(135deg, #0d3d20 0%, #145a32 50%, #1e7e34 100%)",
+              }}
+            >
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "serif",
+                    fontSize: "1.1rem",
+                    color: "#fff",
+                    direction: "rtl",
+                    lineHeight: "1.3",
+                  }}
+                >
+                  رياض
+                  <br />
+                  الصالحين
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-bold text-lg leading-tight">
+                  Рияд ас-Салихин
+                </div>
+                <div className="text-green-200/70 text-xs mt-0.5">
+                  رياض الصالحين
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#d1fae5",
+                    }}
+                  >
+                    6 разделов
+                  </span>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: "rgba(255,255,255,0.15)",
+                      color: "#d1fae5",
+                    }}
+                  >
+                    Сады праведников
+                  </span>
+                </div>
+              </div>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+            <div
+              className="px-5 py-3"
+              style={{
+                background: "rgba(20,120,60,0.05)",
+                borderTop: "1px solid rgba(20,120,60,0.15)",
+              }}
+            >
+              <p className="text-xs" style={{ color: "#5a5a5a" }}>
+                Имам ан-Навави — «Сады праведников». Один из наиболее читаемых
+                сборников хадисов, охватывающий все сферы жизни мусульманина.
+              </p>
+            </div>
+          </button>
+
+          {/* Book 5: 101 хадис */}
+          {renderBookCard({
+            viewId: "bukhari101",
+            gradient:
+              "linear-gradient(135deg, #072b36 0%, #0e7490 50%, #0891b2 100%)",
+            borderColor: "rgba(14,116,144,0.3)",
+            shadowColor: "rgba(14,116,144,0.08)",
+            arabicSymbol: "١٠١",
+            arabicSymbolStyle: { fontSize: "1.6rem" },
+            titleRu: "101 Хадис из Бухари",
+            titleAr: "مائة حديث نبوي",
+            titleColor: "text-cyan-200/70",
+            badge1: "101 хадис",
+            badge2: "Избранные",
+            badgeColor: "#cffafe",
+            description:
+              "Избранные 101 хадис из Сахих аль-Бухари по важнейшим темам: намерение, терпение, семья, соседи, знание.",
+            ocid: "books.bukhari101.button",
+            setView,
+          })}
+
+          {/* Book 6: Болезни нафса */}
+          {renderBookCard({
+            viewId: "nafs",
+            gradient:
+              "linear-gradient(135deg, #3f0a0a 0%, #7f1d1d 50%, #991b1b 100%)",
+            borderColor: "rgba(127,29,29,0.3)",
+            shadowColor: "rgba(127,29,29,0.08)",
+            arabicSymbol: "نفس",
+            arabicSymbolStyle: { fontSize: "1.4rem" },
+            titleRu: "Болезни нафса",
+            titleAr: "أمراض النفس وعلاجها",
+            titleColor: "text-red-200/70",
+            badge1: "5 болезней",
+            badge2: "Пути исцеления",
+            badgeColor: "#fecaca",
+            description:
+              "Гордыня, зависть, гнев, жадность и показуха — духовные болезни сердца и их исцеление.",
+            ocid: "books.nafs.button",
+            setView,
+          })}
+
+          {/* Book 7: Признаки Судного дня */}
+          {renderBookCard({
+            viewId: "qiyama",
+            gradient:
+              "linear-gradient(135deg, #1e0735 0%, #3b0764 50%, #581c87 100%)",
+            borderColor: "rgba(88,28,135,0.3)",
+            shadowColor: "rgba(88,28,135,0.08)",
+            arabicSymbol: "ساعة",
+            arabicSymbolStyle: { fontSize: "1.2rem" },
+            titleRu: "Признаки Судного дня",
+            titleAr: "أشراط الساعة",
+            titleColor: "text-purple-200/70",
+            badge1: "Малые признаки",
+            badge2: "Большие признаки",
+            badgeColor: "#e9d5ff",
+            description:
+              "Малые и большие знамения конца света из достоверных хадисов.",
+            ocid: "books.qiyama.button",
+            setView,
+          })}
+
+          {/* Book 8: Возвращение к Аллаху */}
+          {renderBookCard({
+            viewId: "tawba",
+            gradient:
+              "linear-gradient(135deg, #0e123a 0%, #1e1b4b 50%, #3730a3 100%)",
+            borderColor: "rgba(55,48,163,0.3)",
+            shadowColor: "rgba(55,48,163,0.08)",
+            arabicSymbol: "توبة",
+            arabicSymbolStyle: { fontSize: "1.3rem" },
+            titleRu: "Возвращение к Аллаху",
+            titleAr: "الأوبة إلى الله",
+            titleColor: "text-indigo-200/70",
+            badge1: "Тавба",
+            badge2: "5 условий",
+            badgeColor: "#c7d2fe",
+            description:
+              "Смысл покаяния, его условия и пути возвращения к Аллаху через искреннее раскаяние.",
+            ocid: "books.tawba.button",
+            setView,
+          })}
+
+          {/* Book 9: Сохранение веры */}
+          {renderBookCard({
+            viewId: "iman",
+            gradient:
+              "linear-gradient(135deg, #02271e 0%, #064e3b 50%, #065f46 100%)",
+            borderColor: "rgba(6,95,70,0.3)",
+            shadowColor: "rgba(6,95,70,0.08)",
+            arabicSymbol: "إيمان",
+            arabicSymbolStyle: { fontSize: "1.2rem" },
+            titleRu: "Сохранение веры",
+            titleAr: "حفظ الإيمان",
+            titleColor: "text-emerald-200/70",
+            badge1: "Иман",
+            badge2: "5 разделов",
+            badgeColor: "#a7f3d0",
+            description:
+              "Что ослабляет и укрепляет иман. Роль намаза, зикра и добрых дел в сохранении веры.",
+            ocid: "books.iman.button",
+            setView,
+          })}
+
+          {/* Book 10: Путеводитель мусульманки */}
+          {renderBookCard({
+            viewId: "muslima",
+            gradient:
+              "linear-gradient(135deg, #400d25 0%, #831843 50%, #9d174d 100%)",
+            borderColor: "rgba(157,23,77,0.3)",
+            shadowColor: "rgba(157,23,77,0.08)",
+            arabicSymbol: "مسلمة",
+            arabicSymbolStyle: { fontSize: "1.1rem" },
+            titleRu: "Путеводитель мусульманки",
+            titleAr: "دليل المسلمة",
+            titleColor: "text-rose-200/70",
+            badge1: "Хиджаб · Семья",
+            badge2: "Дуа · Образцы",
+            badgeColor: "#fecdd3",
+            description:
+              "Хиджаб, права женщины, семья, дуа и великие женщины Ислама.",
+            ocid: "books.muslima.button",
+            setView,
+          })}
+
+          {/* Book 11: Ценность времени */}
+          {renderBookCard({
+            viewId: "time",
+            gradient:
+              "linear-gradient(135deg, #3d1a00 0%, #78350f 50%, #92400e 100%)",
+            borderColor: "rgba(146,64,14,0.3)",
+            shadowColor: "rgba(146,64,14,0.08)",
+            arabicSymbol: "وقت",
+            arabicSymbolStyle: { fontSize: "1.4rem" },
+            titleRu: "Ценность времени",
+            titleAr: "قيمة الوقت",
+            titleColor: "text-amber-200/70",
+            badge1: "Тайм-менеджмент",
+            badge2: "Сунна Пророка ﷺ",
+            badgeColor: "#fde68a",
+            description:
+              "Как мусульманину ценить время, планировать день и помнить об ответственности за него.",
+            ocid: "books.time.button",
+            setView,
+          })}
+
+          {/* Book 12: Энциклопедия */}
+          {renderBookCard({
+            viewId: "encyclopedia",
+            gradient:
+              "linear-gradient(135deg, #0a1629 0%, #1e3a5f 50%, #1e40af 100%)",
+            borderColor: "rgba(30,58,95,0.3)",
+            shadowColor: "rgba(30,58,95,0.08)",
+            arabicSymbol: "إسلام",
+            arabicSymbolStyle: { fontSize: "1.2rem" },
+            titleRu: "Расскажи мне об Исламе",
+            titleAr: "حدثني عن الإسلام",
+            titleColor: "text-blue-200/70",
+            badge1: "10 вопросов",
+            badge2: "Для начинающих",
+            badgeColor: "#bfdbfe",
+            description:
+              "Краткая энциклопедия для начинающих: ответы на 10 главных вопросов об Исламе.",
+            ocid: "books.encyclopedia.button",
+            setView,
+          })}
+        </div>
+
+        {/* ── IslamHouse Books ── */}
+        {islamHouseBooks.length > 0 && (
+          <>
+            <div className="mt-6 mb-3 flex items-center gap-2">
+              <div className="h-px flex-1 bg-islamic-500/10" />
+              <span className="text-xs text-muted-foreground/50 font-medium px-2">
+                Книги IslamHouse
+              </span>
+              <div className="h-px flex-1 bg-islamic-500/10" />
+            </div>
+            {islamHouseBooks.map((book, idx) => (
+              <div
+                key={book.id}
+                className="glass-card rounded-2xl overflow-hidden mb-4"
+                style={{
+                  border:
+                    "1px solid rgba(var(--islamic-500-raw, 180,130,40), 0.18)",
+                }}
+                data-ocid={`books.islamhouse.item.${idx + 1}`}
+              >
+                {/* Card header */}
+                <div className="flex items-center gap-4 p-4">
+                  {/* Cover */}
+                  <div
+                    className="w-16 h-20 rounded-xl overflow-hidden shrink-0 flex items-center justify-center"
+                    style={{
+                      background: `hsl(${(idx * 53 + 20) % 360}, 40%, 22%)`,
+                      border: "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <BookText size={22} className="text-white/40" />
                   </div>
-                  {book.titleArabic && (
-                    <div
-                      className="text-white/60 text-xs mt-0.5"
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-foreground leading-snug">
+                      {book.titleRu}
+                    </p>
+                    <p
+                      className="text-xs text-islamic-400/80 mt-0.5 leading-relaxed"
                       style={{ direction: "rtl", fontFamily: "serif" }}
                     >
-                      {book.titleArabic}
-                    </div>
-                  )}
-                  <div className="mt-2 flex gap-2">
-                    <span
-                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: "rgba(255,255,255,0.15)",
-                        color: "#fff",
-                      }}
-                    >
-                      {book.type === "quran_surah"
-                        ? "Сура"
-                        : book.type === "hadith"
-                          ? "Хадисы"
-                          : "Книга"}
-                    </span>
-                    <span
-                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: "rgba(255,255,255,0.15)",
-                        color: "#fff",
-                      }}
-                    >
-                      {book.type === "quran_surah"
-                        ? `${book.ayahs?.length ?? 0} аятов`
-                        : `${book.chapters?.length ?? 0} глав`}
+                      {book.titleAr}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {book.author}
+                    </p>
+                    <span className="inline-block mt-1.5 text-[10px] px-1.5 py-0.5 rounded-md bg-islamic-500/10 text-islamic-400 font-medium">
+                      {book.category}
                     </span>
                   </div>
                 </div>
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.6)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </div>
-              {book.description && (
-                <div
-                  className="px-5 py-3"
-                  style={{
-                    background: `${book.coverColor}0f`,
-                    borderTop: `1px solid ${book.coverColor}25`,
-                  }}
-                >
-                  <p className="text-xs" style={{ color: "#5a5a5a" }}>
-                    {book.description}
-                  </p>
-                </div>
-              )}
-            </button>
-          ))}
-        </>
-      )}
 
-      {/* Bottom note */}
-      <div className="mt-6 glass-card rounded-xl p-4 border border-islamic-500/10">
-        <p className="text-center text-foreground/30 text-xs leading-relaxed">
-          «Читайте Коран, ибо поистине он придёт в День Воскресения как
-          заступник за тех, кто читал его.» (Муслим)
-        </p>
+                {/* Read buttons */}
+                <div
+                  className="flex gap-2 px-4 pb-4"
+                  style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
+                >
+                  {book.hasFileAr && book.fileArName ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        playBookOpen();
+                        setLoadingFileId(`${book.id}-ar`);
+                        try {
+                          const fullBook = await getIslamHouseBookById(book.id);
+                          if (fullBook?.fileAr && fullBook.fileArName) {
+                            setSelectedFile({
+                              dataUrl: fullBook.fileAr,
+                              name: fullBook.fileArName,
+                            });
+                          } else {
+                            toast.error("Файл не найден");
+                          }
+                        } catch {
+                          toast.error("Не удалось загрузить файл");
+                        } finally {
+                          setLoadingFileId(null);
+                        }
+                      }}
+                      disabled={loadingFileId === `${book.id}-ar`}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all duration-150 disabled:opacity-60"
+                      style={{
+                        border: "1px solid rgba(180,130,40,0.3)",
+                        background: "rgba(180,130,40,0.08)",
+                        color: "hsl(var(--islamic-400))",
+                      }}
+                      data-ocid={`books.islamhouse.read-ar.button.${idx + 1}`}
+                    >
+                      {loadingFileId === `${book.id}-ar` ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <BookOpen size={13} />
+                      )}
+                      {loadingFileId === `${book.id}-ar`
+                        ? "Загрузка..."
+                        : "Читать на арабском"}
+                    </button>
+                  ) : (
+                    <div
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium opacity-30"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      <BookOpen size={13} />
+                      Арабский недоступен
+                    </div>
+                  )}
+                  {book.hasFileRu && book.fileRuName ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        playBookOpen();
+                        setLoadingFileId(`${book.id}-ru`);
+                        try {
+                          const fullBook = await getIslamHouseBookById(book.id);
+                          if (fullBook?.fileRu && fullBook.fileRuName) {
+                            setSelectedFile({
+                              dataUrl: fullBook.fileRu,
+                              name: fullBook.fileRuName,
+                            });
+                          } else {
+                            toast.error("Файл не найден");
+                          }
+                        } catch {
+                          toast.error("Не удалось загрузить файл");
+                        } finally {
+                          setLoadingFileId(null);
+                        }
+                      }}
+                      disabled={loadingFileId === `${book.id}-ru`}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-all duration-150 disabled:opacity-60"
+                      style={{
+                        border: "1px solid rgba(59,130,246,0.3)",
+                        background: "rgba(59,130,246,0.08)",
+                        color: "#60a5fa",
+                      }}
+                      data-ocid={`books.islamhouse.read-ru.button.${idx + 1}`}
+                    >
+                      {loadingFileId === `${book.id}-ru` ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <BookOpen size={13} />
+                      )}
+                      {loadingFileId === `${book.id}-ru`
+                        ? "Загрузка..."
+                        : "Читать на русском"}
+                    </button>
+                  ) : (
+                    <div
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium opacity-30"
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      <BookOpen size={13} />
+                      Русский недоступен
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Bottom note */}
+        <div className="mt-6 glass-card rounded-xl p-4 border border-islamic-500/10">
+          <p className="text-center text-foreground/30 text-xs leading-relaxed">
+            «Читайте Коран, ибо поистине он придёт в День Воскресения как
+            заступник за тех, кто читал его.» (Муслим)
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

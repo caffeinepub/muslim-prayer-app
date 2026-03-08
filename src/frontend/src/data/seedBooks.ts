@@ -4,6 +4,7 @@
  * Администратор может редактировать, добавлять и удалять главы/хадисы/аяты.
  */
 import type { CustomBook } from "../components/AdminBooksEditor";
+import { quranFullText } from "./quranFullText";
 
 // Сгенерированные стабильные ID для предустановленных книг
 const SEED_IDS = {
@@ -23,179 +24,30 @@ const SEED_IDS = {
 
 export const SEED_BOOK_IDS = Object.values(SEED_IDS);
 
+// ── Build Quran chapters from full text ────────────────────────────────────────
+const quranChapters = quranFullText.map((surah) => ({
+  id: `seed-quran-ch-${surah.number}`,
+  title: `${surah.number}. ${surah.nameRu}`,
+  titleArabic: surah.nameAr,
+  hadiths: surah.ayahs.map((ayah) => ({
+    id: `seed-q${surah.number}-${ayah.n}`,
+    number: ayah.n,
+    arabic: ayah.ar,
+    translation: ayah.ru,
+  })),
+}));
+
 export const seedBooks: CustomBook[] = [
   // ── 1. Священный Коран ──────────────────────────────────────────────────────
   {
     id: SEED_IDS.QURAN,
     title: "Священный Коран",
     titleArabic: "القرآن الكريم",
-    description: "Слово Аллаха. 114 сур — от Аль-Фатихи до Ан-Наса.",
+    description:
+      "Слово Аллаха. 114 сур с арабским текстом и русским переводом (Кулиев).",
     coverColor: "#1a3c1a",
     type: "hadith",
-    chapters: [
-      {
-        id: "seed-quran-ch-1",
-        title: "Аль-Фатиха (Открывающая)",
-        titleArabic: "سُورَةُ الْفَاتِحَة",
-        hadiths: [
-          {
-            id: "seed-q1-1",
-            number: 1,
-            arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-            translation: "Во имя Аллаха, Милостивого, Милосердного!",
-          },
-          {
-            id: "seed-q1-2",
-            number: 2,
-            arabic: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
-            translation: "Хвала Аллаху, Господу миров,",
-          },
-          {
-            id: "seed-q1-3",
-            number: 3,
-            arabic: "الرَّحْمَٰنِ الرَّحِيمِ",
-            translation: "Милостивому, Милосердному,",
-          },
-          {
-            id: "seed-q1-4",
-            number: 4,
-            arabic: "مَالِكِ يَوْمِ الدِّينِ",
-            translation: "Владыке Дня воздаяния!",
-          },
-          {
-            id: "seed-q1-5",
-            number: 5,
-            arabic: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-            translation:
-              "Тебе одному мы поклоняемся и Тебя одного молим о помощи.",
-          },
-          {
-            id: "seed-q1-6",
-            number: 6,
-            arabic: "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
-            translation: "Веди нас прямым путём,",
-          },
-          {
-            id: "seed-q1-7",
-            number: 7,
-            arabic: "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
-            translation:
-              "путём тех, кого Ты облагодетельствовал, не тех, на кого Ты разгневался, и не заблудших.",
-          },
-        ],
-      },
-      {
-        id: "seed-quran-ch-112",
-        title: "Аль-Ихлас (Очищение веры)",
-        titleArabic: "سُورَةُ الإِخْلَاص",
-        hadiths: [
-          {
-            id: "seed-q112-1",
-            number: 1,
-            arabic: "قُلْ هُوَ اللَّهُ أَحَدٌ",
-            translation: "Скажи: «Он — Аллах Единый,",
-          },
-          {
-            id: "seed-q112-2",
-            number: 2,
-            arabic: "اللَّهُ الصَّمَدُ",
-            translation: "Аллах Вечный.",
-          },
-          {
-            id: "seed-q112-3",
-            number: 3,
-            arabic: "لَمْ يَلِدْ وَلَمْ يُولَدْ",
-            translation: "Он не родил и не был рождён,",
-          },
-          {
-            id: "seed-q112-4",
-            number: 4,
-            arabic: "وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
-            translation: "и нет никого равного Ему».",
-          },
-        ],
-      },
-      {
-        id: "seed-quran-ch-113",
-        title: "Аль-Фалак (Рассвет)",
-        titleArabic: "سُورَةُ الْفَلَق",
-        hadiths: [
-          {
-            id: "seed-q113-1",
-            number: 1,
-            arabic: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
-            translation: "Скажи: «Прибегаю к защите Господа рассвета",
-          },
-          {
-            id: "seed-q113-2",
-            number: 2,
-            arabic: "مِن شَرِّ مَا خَلَقَ",
-            translation: "от зла того, что Он сотворил,",
-          },
-          {
-            id: "seed-q113-3",
-            number: 3,
-            arabic: "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
-            translation: "от зла мрака, когда он наступает,",
-          },
-          {
-            id: "seed-q113-4",
-            number: 4,
-            arabic: "وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ",
-            translation: "от зла колдуний, дующих на узлы,",
-          },
-          {
-            id: "seed-q113-5",
-            number: 5,
-            arabic: "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
-            translation: "от зла завистника, когда он завидует».",
-          },
-        ],
-      },
-      {
-        id: "seed-quran-ch-114",
-        title: "Ан-Нас (Люди)",
-        titleArabic: "سُورَةُ النَّاس",
-        hadiths: [
-          {
-            id: "seed-q114-1",
-            number: 1,
-            arabic: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
-            translation: "Скажи: «Прибегаю к защите Господа людей,",
-          },
-          {
-            id: "seed-q114-2",
-            number: 2,
-            arabic: "مَلِكِ النَّاسِ",
-            translation: "Царя людей,",
-          },
-          {
-            id: "seed-q114-3",
-            number: 3,
-            arabic: "إِلَٰهِ النَّاسِ",
-            translation: "Бога людей,",
-          },
-          {
-            id: "seed-q114-4",
-            number: 4,
-            arabic: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ",
-            translation: "от зла искусителя исчезающего,",
-          },
-          {
-            id: "seed-q114-5",
-            number: 5,
-            arabic: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ",
-            translation: "который нашёптывает в груди людей,",
-          },
-          {
-            id: "seed-q114-6",
-            number: 6,
-            arabic: "مِنَ الْجِنَّةِ وَالنَّاسِ",
-            translation: "будь то джинны или люди».",
-          },
-        ],
-      },
-    ],
+    chapters: quranChapters,
     ayahs: [],
   },
 

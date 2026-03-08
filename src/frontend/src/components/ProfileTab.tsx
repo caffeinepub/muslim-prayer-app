@@ -588,7 +588,14 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
         </motion.div>
 
         {/* Author login */}
-        <div className="glass-card rounded-2xl p-5 space-y-3 border border-islamic-500/10">
+        <div
+          className="rounded-2xl p-5 space-y-3"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.18 0.12 45 / 0.85) 0%, oklch(0.16 0.08 240 / 0.85) 100%)",
+            border: "1px solid oklch(0.55 0.18 45 / 0.3)",
+          }}
+        >
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} className="text-islamic-400" />
             <span className="text-sm font-semibold text-foreground">
@@ -609,11 +616,17 @@ function LoginScreen({ onAuthorLogin }: { onAuthorLogin: () => void }) {
               value={authorPassword}
               onChange={(e) => setAuthorPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAuthorLogin()}
-              className={`bg-secondary/50 h-10 ${
+              className={`h-10 ${
                 authorError
                   ? "border-red-500/60 focus:border-red-500"
-                  : "border-islamic-500/20 focus:border-islamic-500/50"
+                  : "focus:border-orange-400/70"
               }`}
+              style={{
+                background: "oklch(0.12 0.04 45 / 0.6)",
+                borderColor: authorError
+                  ? undefined
+                  : "oklch(0.55 0.18 45 / 0.4)",
+              }}
               data-ocid="profile.author.input"
               autoComplete="off"
             />

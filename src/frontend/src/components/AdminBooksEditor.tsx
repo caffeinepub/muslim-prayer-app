@@ -1,14 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import JSZip from "jszip";
 import {
   ArrowLeft,
   BookOpen,
   ChevronRight,
   Edit,
   FileUp,
-  HelpCircle,
+  Library,
   Loader2,
   Plus,
   Trash2,
@@ -17,6 +16,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SEED_BOOK_IDS, seedBooks } from "../data/seedBooks";
+import IslamHouseBooksManager from "./IslamHouseBooksManager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CustomHadith {
@@ -47,15 +47,24 @@ export interface CustomBook {
   titleArabic?: string;
   description?: string;
   coverColor: string;
-  type: "hadith" | "quran_surah" | "general";
+  type: "hadith" | "quran_surah" | "general" | "pdf";
   chapters?: CustomChapter[];
   ayahs?: CustomAyah[];
+  pdfDataUrl?: string; // base64 data URL for PDF books
 }
 
 // ─── LocalStorage helpers ─────────────────────────────────────────────────────
 const STORAGE_KEY = "custom_books_data";
 const SEED_VERSION_KEY = "custom_books_seed_version";
-const CURRENT_SEED_VERSION = "2"; // bump this to re-seed after changes
+const CURRENT_SEED_VERSION = "3"; // bumped to re-seed with full Quran & remove empty books
+
+/** A book is considered empty if it has no chapters/ayahs and is not a PDF with content */
+function isEmptyBook(b: CustomBook): boolean {
+  if (b.type === "pdf") return !b.pdfDataUrl;
+  const hasChapters = (b.chapters?.length ?? 0) > 0;
+  const hasAyahs = (b.ayahs?.length ?? 0) > 0;
+  return !hasChapters && !hasAyahs;
+}
 
 /**
  * Returns all books: seed books (pre-populated Islamic library) merged with
@@ -72,15 +81,19 @@ export function getCustomBooks(): CustomBook[] {
       const existing: CustomBook[] = raw
         ? (JSON.parse(raw) as CustomBook[])
         : [];
-      // Keep custom (non-seed) books, replace seed books with latest seed
-      const customOnly = existing.filter((b) => !SEED_BOOK_IDS.includes(b.id));
+      // Keep custom (non-seed) non-empty books, replace seed books with latest seed
+      const customOnly = existing.filter(
+        (b) => !SEED_BOOK_IDS.includes(b.id) && !isEmptyBook(b),
+      );
       const merged = [...seedBooks, ...customOnly];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
       return merged;
     }
 
-    return JSON.parse(raw) as CustomBook[];
+    // Only filter out empty seed books — never remove admin-created books
+    const all = JSON.parse(raw) as CustomBook[];
+    return all.filter((b) => !SEED_BOOK_IDS.includes(b.id) || !isEmptyBook(b));
   } catch {
     return seedBooks;
   }
@@ -736,8 +749,14 @@ function BookContentEditor({
   };
 
   const handleSaveAll = () => {
-    const updated: CustomBook =
-      book.type === "quran_surah" ? { ...book, ayahs } : { ...book, chapters };
+    let updated: CustomBook;
+    if (book.type === "quran_surah") {
+      updated = { ...book, ayahs };
+    } else if (book.type === "pdf") {
+      updated = { ...book };
+    } else {
+      updated = { ...book, chapters };
+    }
     onSave(updated);
     toast.success("Содержимое книги сохранено");
     onBack();
@@ -748,7 +767,7 @@ function BookContentEditor({
     return (
       <ChapterEditor
         chapter={selectedChapter}
-        bookType={book.type}
+        bookType={book.type === "pdf" ? "general" : book.type}
         onSave={handleChapterContentSave}
         onBack={() => setSelectedChapter(null)}
       />
@@ -794,6 +813,16 @@ function BookContentEditor({
       </div>
 
       <div className="flex-1 px-4 py-4 pb-24 space-y-4">
+        {/* ── PDF book ── */}
+        {book.type === "pdf" && (
+          <div className="text-center py-8 rounded-xl border border-dashed border-islamic-500/20">
+            <p className="text-sm text-muted-foreground">PDF книга</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">
+              Содержимое PDF загружено и доступно для чтения в разделе Книги
+            </p>
+          </div>
+        )}
+
         {/* ── Quran surah: ayahs ── */}
         {book.type === "quran_surah" && (
           <div className="space-y-3">
@@ -1077,9 +1106,9 @@ function BookForm({
   const [coverColor, setCoverColor] = useState(
     initial?.coverColor ?? COVER_COLORS[0],
   );
-  const [type, setType] = useState<"hadith" | "quran_surah" | "general">(
-    initial?.type ?? "hadith",
-  );
+  const [type, setType] = useState<
+    "hadith" | "quran_surah" | "general" | "pdf"
+  >((initial?.type === "pdf" ? "general" : initial?.type) ?? "hadith");
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
@@ -1284,76 +1313,6 @@ function BookForm({
 
 // ─── FileUpload helper ────────────────────────────────────────────────────────
 
-function parseBookJson(
-  parsed: unknown,
-  onImport: (book: CustomBook) => void,
-  fileName?: string,
-): number {
-  const raw: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-  let imported = 0;
-  for (const [idx, item] of raw.entries()) {
-    const b = item as Partial<CustomBook>;
-    // Generate a fallback title from filename or index if missing
-    const fallbackTitle = fileName
-      ? raw.length > 1
-        ? `${fileName.replace(/\.json$/i, "")} (${idx + 1})`
-        : fileName.replace(/\.json$/i, "")
-      : `Книга ${idx + 1}`;
-    const resolvedTitle =
-      b.title && typeof b.title === "string" && b.title.trim()
-        ? b.title.trim()
-        : fallbackTitle;
-    const book: CustomBook = {
-      id: generateId(),
-      title: resolvedTitle,
-      titleArabic:
-        typeof b.titleArabic === "string"
-          ? b.titleArabic.trim() || undefined
-          : undefined,
-      description:
-        typeof b.description === "string"
-          ? b.description.trim() || undefined
-          : undefined,
-      coverColor:
-        typeof b.coverColor === "string"
-          ? b.coverColor
-          : COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)],
-      type: (["hadith", "quran_surah", "general"] as const).includes(
-        b.type as "hadith",
-      )
-        ? (b.type as CustomBook["type"])
-        : "general",
-      chapters: Array.isArray(b.chapters)
-        ? (b.chapters as CustomChapter[]).map((ch) => ({
-            id: ch.id ?? generateId(),
-            title: ch.title ?? "Без названия",
-            titleArabic: ch.titleArabic,
-            hadiths: Array.isArray(ch.hadiths)
-              ? ch.hadiths.map((h, hi) => ({
-                  id: h.id ?? generateId(),
-                  number: typeof h.number === "number" ? h.number : hi + 1,
-                  arabic: h.arabic ?? "",
-                  translation: h.translation ?? "",
-                  narrator: h.narrator,
-                }))
-              : [],
-          }))
-        : [],
-      ayahs: Array.isArray(b.ayahs)
-        ? (b.ayahs as CustomAyah[]).map((a, ai) => ({
-            id: a.id ?? generateId(),
-            number: typeof a.number === "number" ? a.number : ai + 1,
-            arabic: a.arabic ?? "",
-            translation: a.translation ?? "",
-          }))
-        : [],
-    };
-    onImport(book);
-    imported++;
-  }
-  return imported;
-}
-
 function useFileUpload(onImport: (book: CustomBook) => void) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1367,63 +1326,43 @@ function useFileUpload(onImport: (book: CustomBook) => void) {
     // Reset input so the same file can be re-uploaded if needed
     e.target.value = "";
 
-    const isJson = file.name.endsWith(".json");
-    const isZip = file.name.endsWith(".zip") || file.type === "application/zip";
+    const isPdf =
+      file.name.toLowerCase().endsWith(".pdf") ||
+      file.type === "application/pdf";
 
-    if (!isJson && !isZip) {
-      toast.error("Пожалуйста, загрузите файл в формате JSON или ZIP");
+    if (!isPdf) {
+      toast.error("Пожалуйста, загрузите файл в формате PDF");
+      return;
+    }
+
+    // Limit to 50 MB
+    const MAX_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      toast.error("Файл слишком большой. Максимальный размер — 50 МБ");
       return;
     }
 
     setLoading(true);
 
-    if (isZip) {
-      // Handle ZIP archive containing JSON files
-      JSZip.loadAsync(file)
-        .then(async (zip) => {
-          const jsonFiles = Object.values(zip.files).filter(
-            (f) => !f.dir && f.name.endsWith(".json"),
-          );
-          if (jsonFiles.length === 0) {
-            toast.error("ZIP архив не содержит JSON файлов");
-            return;
-          }
-          let totalImported = 0;
-          for (const jsonFile of jsonFiles) {
-            try {
-              const text = await jsonFile.async("text");
-              const parsed = JSON.parse(text);
-              const baseName = jsonFile.name.split("/").pop() ?? jsonFile.name;
-              totalImported += parseBookJson(parsed, onImport, baseName);
-            } catch {
-              toast.error(`Ошибка в файле ${jsonFile.name}`);
-            }
-          }
-          if (totalImported > 0) {
-            toast.success(`Загружено книг из ZIP: ${totalImported}`);
-          }
-        })
-        .catch(() => {
-          toast.error("Не удалось открыть ZIP архив");
-        })
-        .finally(() => setLoading(false));
-      return;
-    }
-
-    // Handle plain JSON
     const reader = new FileReader();
-    const jsonFileName = file.name;
     reader.onload = (ev) => {
       try {
-        const parsed = JSON.parse(ev.target?.result as string);
-        const imported = parseBookJson(parsed, onImport, jsonFileName);
-        if (imported > 0) {
-          toast.success(`Загружено книг: ${imported}`);
-        }
+        const dataUrl = ev.target?.result as string;
+        const bookName = file.name.replace(/\.pdf$/i, "").trim() || "Книга";
+        const book: CustomBook = {
+          id: generateId(),
+          title: bookName,
+          coverColor:
+            COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)],
+          type: "pdf",
+          pdfDataUrl: dataUrl,
+          chapters: [],
+          ayahs: [],
+        };
+        onImport(book);
+        toast.success(`Книга «${bookName}» загружена`);
       } catch {
-        toast.error(
-          "Ошибка чтения файла. Убедитесь что файл — корректный JSON",
-        );
+        toast.error("Не удалось загрузить PDF файл");
       } finally {
         setLoading(false);
       }
@@ -1432,14 +1371,14 @@ function useFileUpload(onImport: (book: CustomBook) => void) {
       toast.error("Не удалось прочитать файл");
       setLoading(false);
     };
-    reader.readAsText(file, "UTF-8");
+    reader.readAsDataURL(file);
   };
 
   const hiddenInput = (
     <input
       ref={inputRef}
       type="file"
-      accept=".json,.zip,application/json,application/zip"
+      accept=".pdf,application/pdf"
       className="hidden"
       onChange={handleChange}
       data-ocid="admin.books.upload_button"
@@ -1449,131 +1388,7 @@ function useFileUpload(onImport: (book: CustomBook) => void) {
   return { open, loading, hiddenInput };
 }
 
-// ─── FormatHintDialog ─────────────────────────────────────────────────────────
-function FormatHintDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const example = `{
-  "title": "Название книги",
-  "titleArabic": "عنوان الكتاب",
-  "description": "Краткое описание",
-  "type": "hadith",
-  "coverColor": "#1a3c1a",
-  "chapters": [
-    {
-      "title": "Глава 1",
-      "titleArabic": "الباب الأول",
-      "hadiths": [
-        {
-          "number": 1,
-          "arabic": "إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ",
-          "translation": "Поистине, дела — по намерениям",
-          "narrator": "Умар ибн аль-Хаттаб"
-        }
-      ]
-    }
-  ]
-}`;
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.65)" }}
-          onClick={onClose}
-          data-ocid="admin.format.dialog"
-        >
-          <motion.div
-            initial={{ y: 60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 60, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="glass-card rounded-2xl w-full max-w-sm overflow-hidden border border-islamic-500/20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-islamic-500/10">
-              <h3 className="font-bold text-sm text-foreground">
-                Формат файла (JSON / ZIP)
-              </h3>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none"
-                data-ocid="admin.format.close_button"
-              >
-                ×
-              </button>
-            </div>
-            <div className="px-4 py-3 space-y-3 max-h-[70vh] overflow-y-auto">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Загрузите файл{" "}
-                <span className="text-islamic-400 font-semibold">.json</span>{" "}
-                или <span className="text-islamic-400 font-semibold">.zip</span>{" "}
-                (архив с JSON-файлами) с одной книгой или массивом книг.
-                Доступные типы книги:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {(["hadith", "quran_surah", "general"] as const).map((t) => (
-                  <span
-                    key={t}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-islamic-500/15 text-islamic-400 font-mono"
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Для{" "}
-                <span className="text-islamic-400 font-semibold">
-                  quran_surah
-                </span>{" "}
-                используйте поле{" "}
-                <span className="font-mono text-islamic-400">ayahs</span> вместо
-                chapters.
-              </p>
-              <div className="rounded-xl overflow-hidden border border-islamic-500/15">
-                <div
-                  className="px-3 py-1.5 text-[10px] text-muted-foreground/60 font-mono"
-                  style={{ background: "oklch(0.12 0.02 45 / 0.6)" }}
-                >
-                  example.json
-                </div>
-                <pre
-                  className="text-[10px] text-foreground/80 p-3 overflow-x-auto leading-relaxed"
-                  style={{
-                    background: "oklch(0.1 0.015 45 / 0.5)",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  {example}
-                </pre>
-              </div>
-            </div>
-            <div className="px-4 py-3 border-t border-islamic-500/10">
-              <Button
-                size="sm"
-                className="w-full bg-islamic-500/20 text-islamic-400 hover:bg-islamic-500/30 border border-islamic-500/30"
-                variant="outline"
-                onClick={onClose}
-                data-ocid="admin.format.confirm_button"
-              >
-                Понятно
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
+// FormatHintDialog removed — PDF upload needs no format hint
 
 // ─── BooksList ────────────────────────────────────────────────────────────────
 function BooksList({
@@ -1583,6 +1398,7 @@ function BooksList({
   onEdit,
   onEditContent,
   onDelete,
+  onOpenIslamHouse,
 }: {
   books: CustomBook[];
   onAdd: () => void;
@@ -1590,8 +1406,8 @@ function BooksList({
   onEdit: (b: CustomBook) => void;
   onEditContent: (b: CustomBook) => void;
   onDelete: (id: string) => void;
+  onOpenIslamHouse: () => void;
 }) {
-  const [showHint, setShowHint] = useState(false);
   const { open, loading, hiddenInput } = useFileUpload(onImportFile);
   const seedBooks = books.filter((b) => SEED_BOOK_IDS.includes(b.id));
   const customBooksOnly = books.filter((b) => !SEED_BOOK_IDS.includes(b.id));
@@ -1634,12 +1450,16 @@ function BooksList({
                 ? "Хадисы"
                 : book.type === "quran_surah"
                   ? "Сура"
-                  : "Книга"}
+                  : book.type === "pdf"
+                    ? "PDF"
+                    : "Книга"}
             </span>
             <span className="text-[10px] text-muted-foreground">
               {book.type === "quran_surah"
                 ? `${book.ayahs?.length ?? 0} аятов`
-                : `${book.chapters?.length ?? 0} глав`}
+                : book.type === "pdf"
+                  ? "Документ"
+                  : `${book.chapters?.length ?? 0} глав`}
             </span>
             {isSeed && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 font-medium">
@@ -1686,7 +1506,37 @@ function BooksList({
   return (
     <div className="flex-1 px-4 py-4 pb-24 space-y-4">
       {hiddenInput}
-      <FormatHintDialog open={showHint} onClose={() => setShowHint(false)} />
+
+      {/* IslamHouse Books card */}
+      <div
+        className="glass-card rounded-2xl p-4 border border-islamic-500/20"
+        data-ocid="admin.islamhouse.card"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-islamic-500/15 flex items-center justify-center shrink-0">
+              <Library size={16} className="text-islamic-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-foreground">
+                Книги IslamHouse
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Загрузка книг с файлами PDF/EPUB
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-islamic-500/15 border border-islamic-500/30 text-islamic-400 hover:bg-islamic-500/25 text-xs font-semibold shrink-0"
+            variant="outline"
+            onClick={onOpenIslamHouse}
+            data-ocid="admin.islamhouse.open_modal_button"
+          >
+            Управление
+          </Button>
+        </div>
+      </div>
 
       {/* Action buttons row */}
       <div className="flex gap-2">
@@ -1711,17 +1561,8 @@ function BooksList({
           ) : (
             <FileUp size={16} />
           )}
-          Из файла
+          Загрузить PDF
         </Button>
-        <button
-          type="button"
-          onClick={() => setShowHint(true)}
-          className="w-11 h-11 flex items-center justify-center rounded-xl border border-foreground/10 bg-secondary/30 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          title="Формат файла"
-          data-ocid="admin.books.open_modal_button.1"
-        >
-          <HelpCircle size={16} />
-        </button>
       </div>
 
       {/* Empty state */}
@@ -1793,6 +1634,7 @@ export default function AdminBooksEditor({
   const { pending, ask, confirm, cancel } = useConfirm();
   const [books, setBooks] = useState<CustomBook[]>(() => getCustomBooks());
   const [view, setView] = useState<EditorView>({ type: "list" });
+  const [showIslamHouseManager, setShowIslamHouseManager] = useState(false);
 
   // Persist books to localStorage on change
   useEffect(() => {
@@ -1808,6 +1650,13 @@ export default function AdminBooksEditor({
           Доступ запрещён. Только администратор.
         </p>
       </div>
+    );
+  }
+
+  // Show IslamHouse books manager
+  if (showIslamHouseManager) {
+    return (
+      <IslamHouseBooksManager onBack={() => setShowIslamHouseManager(false)} />
     );
   }
 
@@ -1886,6 +1735,7 @@ export default function AdminBooksEditor({
               onEdit={(b) => setView({ type: "edit", book: b })}
               onEditContent={(b) => setView({ type: "content", book: b })}
               onDelete={handleDeleteBook}
+              onOpenIslamHouse={() => setShowIslamHouseManager(true)}
             />
           </motion.div>
         )}

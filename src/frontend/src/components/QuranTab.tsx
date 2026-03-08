@@ -1,134 +1,185 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, BookOpen, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, BookOpen, Loader2, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { quranFullText } from "../data/quranFullText";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
 
-// Ayah data for surahs with full text
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Ayah {
   number: number;
   arabic: string;
   translation: string;
 }
 
-const surahTexts: Record<number, Ayah[]> = {
-  1: [
-    {
-      number: 1,
-      arabic: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
-      translation: "Во имя Аллаха, Милостивого, Милосердного!",
-    },
-    {
-      number: 2,
-      arabic: "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
-      translation: "Хвала Аллаху, Господу миров,",
-    },
-    {
-      number: 3,
-      arabic: "الرَّحْمَٰنِ الرَّحِيمِ",
-      translation: "Милостивому, Милосердному,",
-    },
-    {
-      number: 4,
-      arabic: "مَالِكِ يَوْمِ الدِّينِ",
-      translation: "Владыке Дня воздаяния!",
-    },
-    {
-      number: 5,
-      arabic: "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-      translation: "Тебе одному мы поклоняемся и Тебя одного молим о помощи.",
-    },
-    {
-      number: 6,
-      arabic: "اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
-      translation: "Веди нас прямым путём,",
-    },
-    {
-      number: 7,
-      arabic: "صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ",
-      translation:
-        "путём тех, кого Ты облагодетельствовал, не тех, на кого Ты разгневался, и не заблудших.",
-    },
-  ],
-  112: [
-    {
-      number: 1,
-      arabic: "قُلْ هُوَ اللَّهُ أَحَدٌ",
-      translation: "Скажи: «Он — Аллах Единый,",
-    },
-    { number: 2, arabic: "اللَّهُ الصَّمَدُ", translation: "Аллах Вечный." },
-    {
-      number: 3,
-      arabic: "لَمْ يَلِدْ وَلَمْ يُولَدْ",
-      translation: "Он не родил и не был рождён,",
-    },
-    {
-      number: 4,
-      arabic: "وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ",
-      translation: "и нет никого равного Ему».",
-    },
-  ],
-  113: [
-    {
-      number: 1,
-      arabic: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
-      translation: "Скажи: «Прибегаю к защите Господа рассвета",
-    },
-    {
-      number: 2,
-      arabic: "مِن شَرِّ مَا خَلَقَ",
-      translation: "от зла того, что Он сотворил,",
-    },
-    {
-      number: 3,
-      arabic: "وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ",
-      translation: "от зла мрака, когда он наступает,",
-    },
-    {
-      number: 4,
-      arabic: "وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ",
-      translation: "от зла колдуний, дующих на узлы,",
-    },
-    {
-      number: 5,
-      arabic: "وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ",
-      translation: "от зла завистника, когда он завидует».",
-    },
-  ],
-  114: [
-    {
-      number: 1,
-      arabic: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
-      translation: "Скажи: «Прибегаю к защите Господа людей,",
-    },
-    { number: 2, arabic: "مَلِكِ النَّاسِ", translation: "Царя людей," },
-    { number: 3, arabic: "إِلَٰهِ النَّاسِ", translation: "Бога людей," },
-    {
-      number: 4,
-      arabic: "مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ",
-      translation: "от зла искусителя исчезающего,",
-    },
-    {
-      number: 5,
-      arabic: "الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ",
-      translation: "который нашёптывает в груди людей,",
-    },
-    {
-      number: 6,
-      arabic: "مِنَ الْجِنَّةِ وَالنَّاسِ",
-      translation: "будь то джинны или люди».",
-    },
-  ],
-};
+// ─── Local cache from quranFullText ──────────────────────────────────────────
+// Build a map: surahNumber -> ayahs (only surahs with COMPLETE data)
+const localCompleteAyahs: Record<number, Ayah[]> = {};
+for (const surah of quranFullText) {
+  const meta = quranSurahs.find((s) => s.number === surah.number);
+  if (meta && surah.ayahs.length === meta.verses) {
+    // Complete local data
+    localCompleteAyahs[surah.number] = surah.ayahs.map((a) => ({
+      number: a.n,
+      arabic: a.ar,
+      translation: a.ru,
+    }));
+  }
+}
 
-// Decorative SVG ornament for surah header
+// ─── Persistent cache via localStorage ───────────────────────────────────────
+const CACHE_KEY_PREFIX = "quran_surah_";
+const CACHE_KEY_AR_FULL = "quran_cdn_arabic_full";
+const CACHE_KEY_RU_FULL = "quran_cdn_russian_full";
+
+function getCachedSurah(number: number): Ayah[] | null {
+  try {
+    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${number}`);
+    if (raw) return JSON.parse(raw) as Ayah[];
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function setCachedSurah(number: number, ayahs: Ayah[]) {
+  try {
+    localStorage.setItem(`${CACHE_KEY_PREFIX}${number}`, JSON.stringify(ayahs));
+  } catch {
+    /* ignore - storage full */
+  }
+}
+
+// fawazahmed0 CDN structure: { "1": { "1": "text", "2": "text" }, "2": { ... } }
+type QuranCDNData = Record<string, Record<string, string>>;
+
+let _arFullCache: QuranCDNData | null = null;
+let _ruFullCache: QuranCDNData | null = null;
+
+function loadCDNFromStorage(key: string): QuranCDNData | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as QuranCDNData;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function saveCDNToStorage(key: string, data: QuranCDNData) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    /* storage full — skip caching */
+  }
+}
+
+async function fetchFullCDN(): Promise<{ ar: QuranCDNData; ru: QuranCDNData }> {
+  // Return in-memory if already loaded
+  if (_arFullCache && _ruFullCache) {
+    return { ar: _arFullCache, ru: _ruFullCache };
+  }
+
+  // Try localStorage first (avoid re-downloading on every visit)
+  const cachedAr = loadCDNFromStorage(CACHE_KEY_AR_FULL);
+  const cachedRu = loadCDNFromStorage(CACHE_KEY_RU_FULL);
+  if (cachedAr && cachedRu) {
+    _arFullCache = cachedAr;
+    _ruFullCache = cachedRu;
+    return { ar: cachedAr, ru: cachedRu };
+  }
+
+  // Fetch both editions in parallel from jsdelivr CDN (no CORS issues, very fast)
+  const [arRes, ruRes] = await Promise.all([
+    fetch(
+      "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara.json",
+      { cache: "force-cache" },
+    ),
+    fetch(
+      "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/rus-kuliev.json",
+      { cache: "force-cache" },
+    ),
+  ]);
+
+  if (!arRes.ok || !ruRes.ok) {
+    throw new Error("CDN fetch failed");
+  }
+
+  const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
+
+  _arFullCache = arData as QuranCDNData;
+  _ruFullCache = ruData as QuranCDNData;
+
+  saveCDNToStorage(CACHE_KEY_AR_FULL, _arFullCache);
+  saveCDNToStorage(CACHE_KEY_RU_FULL, _ruFullCache);
+
+  return { ar: _arFullCache, ru: _ruFullCache };
+}
+
+function extractSurahFromCDN(
+  ar: QuranCDNData,
+  ru: QuranCDNData,
+  surahNumber: number,
+): Ayah[] {
+  const arSurah = ar[String(surahNumber)] ?? {};
+  const ruSurah = ru[String(surahNumber)] ?? {};
+  return Object.entries(arSurah).map(([ayahKey, arabicText]) => {
+    const n = Number(ayahKey);
+    return {
+      number: n,
+      arabic: arabicText,
+      translation: ruSurah[ayahKey] ?? "",
+    };
+  });
+}
+
+// ─── Fetch surah from API (with fallback chain) ───────────────────────────────
+async function fetchSurahFromAPI(number: number): Promise<Ayah[]> {
+  // Primary: fawazahmed0 jsdelivr CDN (fast, no CORS)
+  try {
+    const { ar, ru } = await fetchFullCDN();
+    const ayahs = extractSurahFromCDN(ar, ru, number);
+    if (ayahs.length > 0) return ayahs;
+  } catch {
+    /* fall through to backup */
+  }
+
+  // Fallback: api.alquran.cloud
+  const [arRes, ruRes] = await Promise.all([
+    fetch(`https://api.alquran.cloud/v1/surah/${number}`),
+    fetch(`https://api.alquran.cloud/v1/surah/${number}/ru.kuliev`),
+  ]);
+
+  if (!arRes.ok || !ruRes.ok) {
+    throw new Error("All sources failed");
+  }
+
+  const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
+
+  const arAyahs: { numberInSurah: number; text: string }[] =
+    arData?.data?.ayahs ?? [];
+  const ruAyahs: { numberInSurah: number; text: string }[] =
+    ruData?.data?.ayahs ?? [];
+
+  const ruMap: Record<number, string> = {};
+  for (const a of ruAyahs) {
+    ruMap[a.numberInSurah] = a.text;
+  }
+
+  return arAyahs.map((a) => ({
+    number: a.numberInSurah,
+    arabic: a.text,
+    translation: ruMap[a.numberInSurah] ?? "",
+  }));
+}
+
+// ─── Decorative SVG ornament for surah header ─────────────────────────────────
 function SurahOrnament({ name }: { name: string }) {
   return (
     <div
       className="relative flex items-center justify-center w-full mb-1"
       style={{ background: "transparent" }}
     >
-      {/* Ornamental border box */}
       <div
         className="relative w-full flex items-center justify-center py-3 px-4 rounded-lg overflow-hidden"
         style={{
@@ -138,7 +189,7 @@ function SurahOrnament({ name }: { name: string }) {
           boxShadow: "0 2px 8px rgba(76,175,80,0.15)",
         }}
       >
-        {/* Left flower decoration */}
+        {/* Left flower */}
         <svg
           role="img"
           aria-label="Декоративный орнамент"
@@ -162,7 +213,7 @@ function SurahOrnament({ name }: { name: string }) {
             />
           ))}
         </svg>
-        {/* Right flower decoration */}
+        {/* Right flower */}
         <svg
           role="img"
           aria-label="Декоративный орнамент"
@@ -186,10 +237,8 @@ function SurahOrnament({ name }: { name: string }) {
             />
           ))}
         </svg>
-        {/* Horizontal lines */}
         <div className="absolute left-12 right-12 top-1 h-px bg-green-600/30" />
         <div className="absolute left-12 right-12 bottom-1 h-px bg-green-600/30" />
-        {/* Arabic name */}
         <span
           className="text-2xl font-bold"
           style={{
@@ -207,7 +256,7 @@ function SurahOrnament({ name }: { name: string }) {
   );
 }
 
-// Ayah number medallion (like in Muslim Pro)
+// ─── Ayah number medallion ────────────────────────────────────────────────────
 function AyahMedallion({ number }: { number: number }) {
   return (
     <div className="flex-shrink-0 w-8 h-8 relative flex items-center justify-center">
@@ -245,13 +294,69 @@ function AyahMedallion({ number }: { number: number }) {
   );
 }
 
-// Full reading view for a surah
+// ─── Full reading view for a surah ───────────────────────────────────────────
 function SurahReadingView({
   surah,
   onBack,
 }: { surah: Surah; onBack: () => void }) {
-  const ayahs = surahTexts[surah.number];
-  const hasFullText = !!ayahs;
+  const [ayahs, setAyahs] = useState<Ayah[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      // 1. Check complete local data
+      if (localCompleteAyahs[surah.number]) {
+        setAyahs(localCompleteAyahs[surah.number]);
+        return;
+      }
+
+      // 2. Check localStorage cache
+      const cached = getCachedSurah(surah.number);
+      if (cached && cached.length === surah.verses) {
+        setAyahs(cached);
+        return;
+      }
+
+      // 3. Fetch from API
+      setLoading(true);
+      setError(null);
+      try {
+        const fetched = await fetchSurahFromAPI(surah.number);
+        if (!cancelled) {
+          setAyahs(fetched);
+          setCachedSurah(surah.number, fetched);
+        }
+      } catch {
+        if (!cancelled) {
+          // Fallback: use partial local data if available
+          const partial = quranFullText.find((s) => s.number === surah.number);
+          if (partial && partial.ayahs.length > 0) {
+            setAyahs(
+              partial.ayahs.map((a) => ({
+                number: a.n,
+                arabic: a.ar,
+                translation: a.ru,
+              })),
+            );
+          } else {
+            setError(
+              "Не удалось загрузить текст суры. Проверьте подключение к интернету.",
+            );
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [surah.number, surah.verses]);
 
   return (
     <div
@@ -281,6 +386,11 @@ function SurahReadingView({
           <div className="text-xs font-semibold" style={{ color: "#2e7d32" }}>
             {surah.number}. {surah.nameRu}
           </div>
+          {ayahs && (
+            <div className="text-[10px]" style={{ color: "#4caf50" }}>
+              {ayahs.length} аятов
+            </div>
+          )}
         </div>
         <div className="w-16" />
       </div>
@@ -324,8 +434,44 @@ function SurahReadingView({
           </span>
         </div>
 
+        {/* Loading state */}
+        {loading && (
+          <div
+            className="flex flex-col items-center justify-center py-16 gap-4"
+            data-ocid="quran.reading.loading_state"
+          >
+            <Loader2
+              size={32}
+              className="animate-spin"
+              style={{ color: "#4caf50" }}
+            />
+            <p className="text-sm" style={{ color: "#4caf50" }}>
+              Загрузка текста суры...
+            </p>
+            <p className="text-xs text-center" style={{ color: "#888" }}>
+              Источник: cdn.jsdelivr.net (quran-api)
+            </p>
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && !loading && (
+          <div
+            className="rounded-2xl p-5 text-center"
+            style={{
+              background: "rgba(244,67,54,0.07)",
+              border: "1px solid rgba(244,67,54,0.2)",
+            }}
+            data-ocid="quran.reading.error_state"
+          >
+            <p className="text-sm" style={{ color: "#c62828" }}>
+              {error}
+            </p>
+          </div>
+        )}
+
         {/* Ayahs */}
-        {hasFullText ? (
+        {ayahs && !loading && (
           <div className="space-y-0">
             {ayahs.map((ayah, idx) => (
               <div
@@ -360,72 +506,25 @@ function SurahReadingView({
                   </div>
                 </div>
                 {/* Translation */}
-                <p
-                  className="text-sm leading-relaxed mt-1"
-                  style={{ color: "#5a5a5a", lineHeight: "1.7" }}
-                >
-                  <span
-                    style={{
-                      color: "#4caf50",
-                      fontWeight: 600,
-                      marginRight: "4px",
-                    }}
+                {ayah.translation && (
+                  <p
+                    className="text-sm leading-relaxed mt-1"
+                    style={{ color: "#5a5a5a", lineHeight: "1.7" }}
                   >
-                    {ayah.number}.
-                  </span>
-                  {ayah.translation}
-                </p>
+                    <span
+                      style={{
+                        color: "#4caf50",
+                        fontWeight: 600,
+                        marginRight: "4px",
+                      }}
+                    >
+                      {ayah.number}.
+                    </span>
+                    {ayah.translation}
+                  </p>
+                )}
               </div>
             ))}
-          </div>
-        ) : (
-          /* No full text available - show description + prompt */
-          <div className="space-y-4">
-            <div
-              className="rounded-2xl p-5"
-              style={{
-                background: "rgba(76,175,80,0.07)",
-                border: "1px solid rgba(76,175,80,0.2)",
-              }}
-            >
-              <div
-                className="text-xs font-semibold uppercase tracking-widest mb-3"
-                style={{ color: "#4caf50" }}
-              >
-                О суре
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: "#333" }}>
-                {surah.descriptionRu}
-              </p>
-            </div>
-
-            {/* Arabic name large */}
-            <div
-              className="text-center py-8"
-              style={{
-                fontFamily: "serif",
-                direction: "rtl",
-                fontSize: "3rem",
-                color: "#1a3c1a",
-              }}
-            >
-              {surah.arabic}
-            </div>
-
-            <div
-              className="text-center text-sm rounded-2xl py-4 px-5"
-              style={{
-                background: "rgba(76,175,80,0.07)",
-                border: "1px dashed rgba(76,175,80,0.3)",
-                color: "#666",
-              }}
-            >
-              Полный текст этой суры содержит {surah.verses} аятов.
-              <br />
-              <span style={{ color: "#4caf50" }}>
-                Скоро будет добавлен полный текст.
-              </span>
-            </div>
           </div>
         )}
       </div>

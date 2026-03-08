@@ -284,11 +284,16 @@ function AuthOnboardingScreen({ onDone, onAuthorLogin }: AuthOnboardingProps) {
                         onKeyDown={(e) =>
                           e.key === "Enter" && handleAuthorLogin()
                         }
-                        className={`pl-8 h-10 text-sm rounded-xl bg-background/50 border transition-colors ${
+                        className={`pl-8 h-10 text-sm rounded-xl border transition-colors ${
                           authorError
                             ? "border-red-500/60 focus-visible:ring-red-500/30"
                             : "border-border/40 focus-visible:ring-islamic-500/30"
                         }`}
+                        style={{
+                          background:
+                            "linear-gradient(135deg, oklch(0.18 0.12 45 / 0.7) 0%, oklch(0.16 0.08 240 / 0.7) 100%)",
+                          color: "oklch(0.92 0.02 45)",
+                        }}
                         data-ocid="auth.author.input"
                       />
                     </div>
