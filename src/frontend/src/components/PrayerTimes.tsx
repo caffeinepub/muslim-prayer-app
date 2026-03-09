@@ -240,6 +240,32 @@ export default function PrayerTimesTab() {
     return () => clearInterval(interval);
   }, []);
 
+  // Reset prayer completions when the logged-in user changes
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const currentUserId =
+      firebaseUser?.uid ?? (isAuthorLoggedIn ? "author" : null);
+    if (prevUserIdRef.current === undefined) {
+      // Initial mount — just record the current user, do not reset
+      prevUserIdRef.current = currentUserId;
+      return;
+    }
+    if (prevUserIdRef.current !== currentUserId) {
+      // User changed (login, logout, or switch) — clear prayer completions
+      prevUserIdRef.current = currentUserId;
+      setPrayersDone(new Set());
+      try {
+        localStorage.setItem(
+          PRAYER_TRACK_KEY,
+          JSON.stringify({ date: getTodayKey(), keys: [] }),
+        );
+        localStorage.setItem("prayers_checked", "0");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [firebaseUser?.uid, isAuthorLoggedIn]);
+
   // Load backend settings — only update if no localStorage data exists
   useEffect(() => {
     if (savedSettings === undefined) return;

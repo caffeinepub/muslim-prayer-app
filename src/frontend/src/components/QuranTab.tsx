@@ -1,40 +1,88 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, BookOpen, Loader2, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Loader2,
+  Pause,
+  Play,
+  Search,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { quranFullText } from "../data/quranFullText";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
+
+// ─── API Configuration ────────────────────────────────────────────────────────
+const QURAN_COM_BASE = "https://api.quran.com/api/v4";
+const QURAN_COM_CLIENT_ID = "838d2f27-b48f-449d-be70-771939b581c6";
+const AUDIO_BASE_URL = "https://verses.quran.com/";
+const RECITER_ID = 7; // Mishari Rashid al-Afasy
+const TRANSLATION_ID = 45; // Kuliev Russian
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Ayah {
   number: number;
   arabic: string;
   translation: string;
+  audioUrl: string | null;
+}
+
+interface QuranComVerse {
+  id: number;
+  verse_number: number;
+  verse_key: string;
+  audio?: { url: string };
+  words?: Array<{ text_uthmani: string; char_type_name?: string }>;
+  translations?: Array<{ id: number; resource_id: number; text: string }>;
+}
+
+interface QuranComResponse {
+  verses: QuranComVerse[];
+  pagination: {
+    current_page: number;
+    next_page: number | null;
+    per_page: number;
+    total_records: number;
+    total_pages: number;
+  };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function stripHtml(html: string): string {
+  return html
+    .replace(/<sup[^>]*>.*?<\/sup>/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function quranComHeaders(): HeadersInit {
+  return { "x-client-id": QURAN_COM_CLIENT_ID };
 }
 
 // ─── Local cache from quranFullText ──────────────────────────────────────────
-// Build a map: surahNumber -> ayahs (only surahs with COMPLETE data)
 const localCompleteAyahs: Record<number, Ayah[]> = {};
 for (const surah of quranFullText) {
   const meta = quranSurahs.find((s) => s.number === surah.number);
   if (meta && surah.ayahs.length === meta.verses) {
-    // Complete local data
     localCompleteAyahs[surah.number] = surah.ayahs.map((a) => ({
       number: a.n,
       arabic: a.ar,
       translation: a.ru,
+      audioUrl: null,
     }));
   }
 }
 
 // ─── Persistent cache via localStorage ───────────────────────────────────────
-const CACHE_KEY_PREFIX = "quran_surah_";
-const CACHE_KEY_AR_FULL = "quran_cdn_arabic_full";
-const CACHE_KEY_RU_FULL = "quran_cdn_russian_full";
+const CACHE_V4_PREFIX = "quran_v4_surah_";
+const CACHE_AUDIO_PREFIX = "quran_v4_audio_";
 
 function getCachedSurah(number: number): Ayah[] | null {
   try {
-    const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${number}`);
+    const raw = localStorage.getItem(`${CACHE_V4_PREFIX}${number}`);
     if (raw) return JSON.parse(raw) as Ayah[];
   } catch {
     /* ignore */
@@ -44,17 +92,96 @@ function getCachedSurah(number: number): Ayah[] | null {
 
 function setCachedSurah(number: number, ayahs: Ayah[]) {
   try {
-    localStorage.setItem(`${CACHE_KEY_PREFIX}${number}`, JSON.stringify(ayahs));
+    localStorage.setItem(`${CACHE_V4_PREFIX}${number}`, JSON.stringify(ayahs));
   } catch {
-    /* ignore - storage full */
+    /* storage full */
   }
 }
 
-// fawazahmed0 CDN structure: { "1": { "1": "text", "2": "text" }, "2": { ... } }
-type QuranCDNData = Record<string, Record<string, string>>;
+function getCachedChapterAudio(number: number): string | null {
+  try {
+    return localStorage.getItem(`${CACHE_AUDIO_PREFIX}${number}`);
+  } catch {
+    return null;
+  }
+}
 
+function setCachedChapterAudio(number: number, url: string) {
+  try {
+    localStorage.setItem(`${CACHE_AUDIO_PREFIX}${number}`, url);
+  } catch {
+    /* storage full */
+  }
+}
+
+// ─── quran.com API fetcher ────────────────────────────────────────────────────
+async function fetchSurahFromQuranCom(
+  surahNumber: number,
+  onProgress?: (page: number, total: number) => void,
+): Promise<Ayah[]> {
+  const allVerses: QuranComVerse[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const url = `${QURAN_COM_BASE}/verses/by_chapter/${surahNumber}?language=ru&words=true&word_fields=text_uthmani&translations=${TRANSLATION_ID}&audio=${RECITER_ID}&per_page=300&page=${page}`;
+    const res = await fetch(url, { headers: quranComHeaders() });
+    if (!res.ok) throw new Error(`quran.com API error: ${res.status}`);
+    const data: QuranComResponse = await res.json();
+    allVerses.push(...data.verses);
+    totalPages = data.pagination.total_pages;
+    if (onProgress) onProgress(page, totalPages);
+    page = data.pagination.next_page ?? page + 1;
+  } while (page <= totalPages && allVerses.length < 10000);
+
+  return allVerses.map((v) => {
+    // Arabic text: join word texts (filter out end-of-ayah markers)
+    const arabicText = (v.words ?? [])
+      .filter((w) => w.char_type_name !== "end")
+      .map((w) => w.text_uthmani)
+      .join(" ");
+
+    // Translation: first matching translation, strip HTML
+    const translationText = v.translations?.[0]?.text
+      ? stripHtml(v.translations[0].text)
+      : "";
+
+    // Audio URL
+    const audioUrl = v.audio?.url ? `${AUDIO_BASE_URL}${v.audio.url}` : null;
+
+    return {
+      number: v.verse_number,
+      arabic: arabicText,
+      translation: translationText,
+      audioUrl,
+    };
+  });
+}
+
+async function fetchChapterAudio(surahNumber: number): Promise<string | null> {
+  const cached = getCachedChapterAudio(surahNumber);
+  if (cached) return cached;
+  try {
+    const res = await fetch(
+      `${QURAN_COM_BASE}/chapter_recitations/${RECITER_ID}/${surahNumber}`,
+      { headers: quranComHeaders() },
+    );
+    if (!res.ok) return null;
+    const data: { audio_file: { audio_url: string } } = await res.json();
+    const audioUrl = data.audio_file?.audio_url ?? null;
+    if (audioUrl) setCachedChapterAudio(surahNumber, audioUrl);
+    return audioUrl;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Fallback: fawazahmed0 CDN ────────────────────────────────────────────────
+type QuranCDNData = Record<string, Record<string, string>>;
 let _arFullCache: QuranCDNData | null = null;
 let _ruFullCache: QuranCDNData | null = null;
+const CACHE_KEY_AR_FULL = "quran_cdn_arabic_full";
+const CACHE_KEY_RU_FULL = "quran_cdn_russian_full";
 
 function loadCDNFromStorage(key: string): QuranCDNData | null {
   try {
@@ -70,116 +197,83 @@ function saveCDNToStorage(key: string, data: QuranCDNData) {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch {
-    /* storage full — skip caching */
+    /* storage full */
   }
 }
 
-async function fetchFullCDN(): Promise<{ ar: QuranCDNData; ru: QuranCDNData }> {
-  // Return in-memory if already loaded
-  if (_arFullCache && _ruFullCache) {
-    return { ar: _arFullCache, ru: _ruFullCache };
+async function fetchFromCDNFallback(surahNumber: number): Promise<Ayah[]> {
+  if (!_arFullCache || !_ruFullCache) {
+    const cachedAr = loadCDNFromStorage(CACHE_KEY_AR_FULL);
+    const cachedRu = loadCDNFromStorage(CACHE_KEY_RU_FULL);
+    if (cachedAr && cachedRu) {
+      _arFullCache = cachedAr;
+      _ruFullCache = cachedRu;
+    } else {
+      const [arRes, ruRes] = await Promise.all([
+        fetch(
+          "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara.json",
+          { cache: "force-cache" },
+        ),
+        fetch(
+          "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/rus-kuliev.json",
+          { cache: "force-cache" },
+        ),
+      ]);
+      if (!arRes.ok || !ruRes.ok) throw new Error("CDN fetch failed");
+      const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
+      _arFullCache = arData as QuranCDNData;
+      _ruFullCache = ruData as QuranCDNData;
+      saveCDNToStorage(CACHE_KEY_AR_FULL, _arFullCache);
+      saveCDNToStorage(CACHE_KEY_RU_FULL, _ruFullCache);
+    }
   }
-
-  // Try localStorage first (avoid re-downloading on every visit)
-  const cachedAr = loadCDNFromStorage(CACHE_KEY_AR_FULL);
-  const cachedRu = loadCDNFromStorage(CACHE_KEY_RU_FULL);
-  if (cachedAr && cachedRu) {
-    _arFullCache = cachedAr;
-    _ruFullCache = cachedRu;
-    return { ar: cachedAr, ru: cachedRu };
-  }
-
-  // Fetch both editions in parallel from jsdelivr CDN (no CORS issues, very fast)
-  const [arRes, ruRes] = await Promise.all([
-    fetch(
-      "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara.json",
-      { cache: "force-cache" },
-    ),
-    fetch(
-      "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/rus-kuliev.json",
-      { cache: "force-cache" },
-    ),
-  ]);
-
-  if (!arRes.ok || !ruRes.ok) {
-    throw new Error("CDN fetch failed");
-  }
-
-  const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
-
-  _arFullCache = arData as QuranCDNData;
-  _ruFullCache = ruData as QuranCDNData;
-
-  saveCDNToStorage(CACHE_KEY_AR_FULL, _arFullCache);
-  saveCDNToStorage(CACHE_KEY_RU_FULL, _ruFullCache);
-
-  return { ar: _arFullCache, ru: _ruFullCache };
-}
-
-function extractSurahFromCDN(
-  ar: QuranCDNData,
-  ru: QuranCDNData,
-  surahNumber: number,
-): Ayah[] {
-  const arSurah = ar[String(surahNumber)] ?? {};
-  const ruSurah = ru[String(surahNumber)] ?? {};
-  return Object.entries(arSurah).map(([ayahKey, arabicText]) => {
-    const n = Number(ayahKey);
-    return {
-      number: n,
-      arabic: arabicText,
-      translation: ruSurah[ayahKey] ?? "",
-    };
-  });
-}
-
-// ─── Fetch surah from API (with fallback chain) ───────────────────────────────
-async function fetchSurahFromAPI(number: number): Promise<Ayah[]> {
-  // Primary: fawazahmed0 jsdelivr CDN (fast, no CORS)
-  try {
-    const { ar, ru } = await fetchFullCDN();
-    const ayahs = extractSurahFromCDN(ar, ru, number);
-    if (ayahs.length > 0) return ayahs;
-  } catch {
-    /* fall through to backup */
-  }
-
-  // Fallback: api.alquran.cloud
-  const [arRes, ruRes] = await Promise.all([
-    fetch(`https://api.alquran.cloud/v1/surah/${number}`),
-    fetch(`https://api.alquran.cloud/v1/surah/${number}/ru.kuliev`),
-  ]);
-
-  if (!arRes.ok || !ruRes.ok) {
-    throw new Error("All sources failed");
-  }
-
-  const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
-
-  const arAyahs: { numberInSurah: number; text: string }[] =
-    arData?.data?.ayahs ?? [];
-  const ruAyahs: { numberInSurah: number; text: string }[] =
-    ruData?.data?.ayahs ?? [];
-
-  const ruMap: Record<number, string> = {};
-  for (const a of ruAyahs) {
-    ruMap[a.numberInSurah] = a.text;
-  }
-
-  return arAyahs.map((a) => ({
-    number: a.numberInSurah,
-    arabic: a.text,
-    translation: ruMap[a.numberInSurah] ?? "",
+  const arSurah = _arFullCache?.[String(surahNumber)] ?? {};
+  const ruSurah = _ruFullCache?.[String(surahNumber)] ?? {};
+  return Object.entries(arSurah).map(([k, arabic]) => ({
+    number: Number(k),
+    arabic,
+    translation: ruSurah[k] ?? "",
+    audioUrl: null,
   }));
+}
+
+// ─── Main fetch function with fallback chain ──────────────────────────────────
+async function fetchSurahAyahs(
+  surah: Surah,
+  onProgress?: (page: number, total: number) => void,
+): Promise<Ayah[]> {
+  // 1. Local complete data
+  if (localCompleteAyahs[surah.number]) {
+    return localCompleteAyahs[surah.number];
+  }
+  // 2. localStorage cache
+  const cached = getCachedSurah(surah.number);
+  if (cached && cached.length >= surah.verses) {
+    return cached;
+  }
+  // 3. quran.com API (primary)
+  try {
+    const ayahs = await fetchSurahFromQuranCom(surah.number, onProgress);
+    if (ayahs.length > 0) {
+      setCachedSurah(surah.number, ayahs);
+      return ayahs;
+    }
+  } catch {
+    /* fall through */
+  }
+  // 4. CDN fallback
+  const cdnAyahs = await fetchFromCDNFallback(surah.number);
+  if (cdnAyahs.length > 0) {
+    setCachedSurah(surah.number, cdnAyahs);
+    return cdnAyahs;
+  }
+  throw new Error("All sources failed");
 }
 
 // ─── Decorative SVG ornament for surah header ─────────────────────────────────
 function SurahOrnament({ name }: { name: string }) {
   return (
-    <div
-      className="relative flex items-center justify-center w-full mb-1"
-      style={{ background: "transparent" }}
-    >
+    <div className="relative flex items-center justify-center w-full mb-1">
       <div
         className="relative w-full flex items-center justify-center py-3 px-4 rounded-lg overflow-hidden"
         style={{
@@ -189,10 +283,9 @@ function SurahOrnament({ name }: { name: string }) {
           boxShadow: "0 2px 8px rgba(76,175,80,0.15)",
         }}
       >
-        {/* Left flower */}
         <svg
           role="img"
-          aria-label="Декоративный орнамент"
+          aria-label="Орнамент"
           className="absolute left-2 top-1/2 -translate-y-1/2"
           width="36"
           height="36"
@@ -213,10 +306,9 @@ function SurahOrnament({ name }: { name: string }) {
             />
           ))}
         </svg>
-        {/* Right flower */}
         <svg
           role="img"
-          aria-label="Декоративный орнамент"
+          aria-label="Орнамент"
           className="absolute right-2 top-1/2 -translate-y-1/2"
           width="36"
           height="36"
@@ -245,7 +337,6 @@ function SurahOrnament({ name }: { name: string }) {
             fontFamily: "serif",
             direction: "rtl",
             color: "#1a3c1a",
-            textShadow: "0 1px 2px rgba(0,0,0,0.08)",
             letterSpacing: "0.04em",
           }}
         >
@@ -294,6 +385,80 @@ function AyahMedallion({ number }: { number: number }) {
   );
 }
 
+// ─── Audio Player Bar ─────────────────────────────────────────────────────────
+function AudioPlayerBar({
+  surahName,
+  ayahs,
+  playingAyah,
+  isPlayingFull,
+  onPlayFull,
+  onPauseFull,
+}: {
+  surahName: string;
+  ayahs: Ayah[];
+  playingAyah: number | null;
+  isPlayingFull: boolean;
+  onPlayFull: () => void;
+  onPauseFull: () => void;
+}) {
+  const hasAudio = ayahs.some((a) => a.audioUrl !== null);
+
+  if (!hasAudio) return null;
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-xl mb-4"
+      style={{
+        background: "linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)",
+        border: "1px solid rgba(76,175,80,0.3)",
+      }}
+      data-ocid="quran.audio.panel"
+    >
+      {/* Full surah play/pause */}
+      <button
+        type="button"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 active:scale-95"
+        style={{
+          background: isPlayingFull ? "#2e7d32" : "rgba(76,175,80,0.15)",
+          color: isPlayingFull ? "#fff" : "#2e7d32",
+          border: "1px solid rgba(76,175,80,0.4)",
+        }}
+        onClick={isPlayingFull ? onPauseFull : onPlayFull}
+        data-ocid="quran.audio.primary_button"
+      >
+        {isPlayingFull ? <Pause size={14} /> : <Play size={14} />}
+        <span>{isPlayingFull ? "Пауза" : "▶ Слушать суру"}</span>
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <p
+          className="text-xs font-medium truncate"
+          style={{ color: "#1a3c1a" }}
+        >
+          {surahName}
+        </p>
+        {playingAyah !== null && (
+          <p className="text-[10px]" style={{ color: "#4caf50" }}>
+            Аят {playingAyah}
+          </p>
+        )}
+        {isPlayingFull && playingAyah === null && (
+          <p className="text-[10px]" style={{ color: "#4caf50" }}>
+            Полная сура
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Volume2 size={14} style={{ color: "#4caf50" }} />
+        <span className="text-[10px]" style={{ color: "#4caf50" }}>
+          Алафаси
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Full reading view for a surah ───────────────────────────────────────────
 function SurahReadingView({
   surah,
@@ -301,37 +466,41 @@ function SurahReadingView({
 }: { surah: Surah; onBack: () => void }) {
   const [ayahs, setAyahs] = useState<Ayah[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Audio state
+  const [playingAyah, setPlayingAyah] = useState<number | null>(null);
+  const [isPlayingFull, setIsPlayingFull] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const ayahAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fullAudioRef = useRef<HTMLAudioElement | null>(null);
+  const chapterAudioUrlRef = useRef<string | null>(null);
+  const playingAyahRef = useRef<number | null>(null);
+
+  // Load ayahs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: surah is a stable prop object; we intentionally key on number only
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      // 1. Check complete local data
-      if (localCompleteAyahs[surah.number]) {
-        setAyahs(localCompleteAyahs[surah.number]);
-        return;
-      }
-
-      // 2. Check localStorage cache
-      const cached = getCachedSurah(surah.number);
-      if (cached && cached.length === surah.verses) {
-        setAyahs(cached);
-        return;
-      }
-
-      // 3. Fetch from API
       setLoading(true);
       setError(null);
+      setLoadingPage(null);
       try {
-        const fetched = await fetchSurahFromAPI(surah.number);
+        const fetched = await fetchSurahAyahs(surah, (page, total) => {
+          if (!cancelled) setLoadingPage({ current: page, total });
+        });
         if (!cancelled) {
           setAyahs(fetched);
-          setCachedSurah(surah.number, fetched);
+          setLoadingPage(null);
         }
       } catch {
         if (!cancelled) {
-          // Fallback: use partial local data if available
           const partial = quranFullText.find((s) => s.number === surah.number);
           if (partial && partial.ayahs.length > 0) {
             setAyahs(
@@ -339,6 +508,7 @@ function SurahReadingView({
                 number: a.n,
                 arabic: a.ar,
                 translation: a.ru,
+                audioUrl: null,
               })),
             );
           } else {
@@ -356,7 +526,137 @@ function SurahReadingView({
     return () => {
       cancelled = true;
     };
-  }, [surah.number, surah.verses]);
+  }, [surah.number]);
+
+  // Pre-fetch chapter audio URL in background
+  useEffect(() => {
+    fetchChapterAudio(surah.number).then((url) => {
+      chapterAudioUrlRef.current = url;
+    });
+  }, [surah.number]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      ayahAudioRef.current?.pause();
+      fullAudioRef.current?.pause();
+    };
+  }, []);
+
+  // ── Audio handlers ──
+  function stopAllAudio() {
+    ayahAudioRef.current?.pause();
+    if (ayahAudioRef.current) {
+      ayahAudioRef.current.currentTime = 0;
+      ayahAudioRef.current = null;
+    }
+    fullAudioRef.current?.pause();
+    if (fullAudioRef.current) {
+      fullAudioRef.current.currentTime = 0;
+      fullAudioRef.current = null;
+    }
+    setPlayingAyah(null);
+    setIsPlayingFull(false);
+    playingAyahRef.current = null;
+  }
+
+  function playFullSurah() {
+    stopAllAudio();
+    const url = chapterAudioUrlRef.current;
+    if (!url) {
+      // fallback: play ayahs sequentially
+      if (ayahs && ayahs.length > 0 && ayahs[0].audioUrl) {
+        playAyahSequentially(ayahs, 0);
+      }
+      return;
+    }
+    const audio = new Audio(url);
+    audio.muted = isMuted;
+    fullAudioRef.current = audio;
+    setIsPlayingFull(true);
+    audio.play().catch(() => setIsPlayingFull(false));
+    audio.onended = () => {
+      setIsPlayingFull(false);
+      fullAudioRef.current = null;
+    };
+    audio.onerror = () => {
+      setIsPlayingFull(false);
+      fullAudioRef.current = null;
+      // fallback to sequential
+      if (ayahs && ayahs.length > 0 && ayahs[0].audioUrl) {
+        playAyahSequentially(ayahs, 0);
+      }
+    };
+  }
+
+  function playAyahSequentially(allAyahs: Ayah[], index: number) {
+    if (index >= allAyahs.length) {
+      setPlayingAyah(null);
+      setIsPlayingFull(false);
+      return;
+    }
+    const ayah = allAyahs[index];
+    if (!ayah.audioUrl) {
+      playAyahSequentially(allAyahs, index + 1);
+      return;
+    }
+    setPlayingAyah(ayah.number);
+    playingAyahRef.current = ayah.number;
+    setIsPlayingFull(true);
+    const audio = new Audio(ayah.audioUrl);
+    audio.muted = isMuted;
+    ayahAudioRef.current = audio;
+    audio.play().catch(() => {});
+    audio.onended = () => playAyahSequentially(allAyahs, index + 1);
+    audio.onerror = () => playAyahSequentially(allAyahs, index + 1);
+  }
+
+  function handlePlayFull() {
+    playFullSurah();
+  }
+
+  function handlePauseFull() {
+    ayahAudioRef.current?.pause();
+    fullAudioRef.current?.pause();
+    setIsPlayingFull(false);
+    setPlayingAyah(null);
+    playingAyahRef.current = null;
+  }
+
+  function handlePlayAyah(ayahNumber: number) {
+    const ayah = ayahs?.find((a) => a.number === ayahNumber);
+    if (!ayah?.audioUrl) return;
+
+    stopAllAudio();
+    setPlayingAyah(ayahNumber);
+    playingAyahRef.current = ayahNumber;
+
+    const audio = new Audio(ayah.audioUrl);
+    audio.muted = isMuted;
+    ayahAudioRef.current = audio;
+    audio.play().catch(() => setPlayingAyah(null));
+    audio.onended = () => {
+      setPlayingAyah(null);
+      ayahAudioRef.current = null;
+    };
+    audio.onerror = () => {
+      setPlayingAyah(null);
+      ayahAudioRef.current = null;
+    };
+  }
+
+  function handlePauseAyah() {
+    ayahAudioRef.current?.pause();
+    setPlayingAyah(null);
+    playingAyahRef.current = null;
+  }
+
+  function toggleMute() {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    if (ayahAudioRef.current) ayahAudioRef.current.muted = newMuted;
+    if (fullAudioRef.current) fullAudioRef.current.muted = newMuted;
+  }
 
   return (
     <div
@@ -376,7 +676,10 @@ function SurahReadingView({
           type="button"
           className="flex items-center gap-2 text-sm font-medium"
           style={{ color: "#2e7d32" }}
-          onClick={onBack}
+          onClick={() => {
+            stopAllAudio();
+            onBack();
+          }}
           data-ocid="quran.reading.back_button"
         >
           <ArrowLeft size={18} />
@@ -392,7 +695,16 @@ function SurahReadingView({
             </div>
           )}
         </div>
-        <div className="w-16" />
+        <button
+          type="button"
+          className="p-2 rounded-full"
+          style={{ color: isMuted ? "#bbb" : "#4caf50" }}
+          onClick={toggleMute}
+          title={isMuted ? "Включить звук" : "Выключить звук"}
+          data-ocid="quran.audio.toggle"
+        >
+          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        </button>
       </div>
 
       {/* Scrollable content */}
@@ -411,7 +723,7 @@ function SurahReadingView({
         )}
 
         {/* Info row */}
-        <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="flex items-center justify-center gap-3 mb-4">
           <span
             className="text-xs px-3 py-1 rounded-full font-medium"
             style={{
@@ -434,6 +746,18 @@ function SurahReadingView({
           </span>
         </div>
 
+        {/* Audio player bar */}
+        {ayahs && !loading && (
+          <AudioPlayerBar
+            surahName={surah.nameRu}
+            ayahs={ayahs}
+            playingAyah={playingAyah}
+            isPlayingFull={isPlayingFull}
+            onPlayFull={handlePlayFull}
+            onPauseFull={handlePauseFull}
+          />
+        )}
+
         {/* Loading state */}
         {loading && (
           <div
@@ -445,11 +769,13 @@ function SurahReadingView({
               className="animate-spin"
               style={{ color: "#4caf50" }}
             />
-            <p className="text-sm" style={{ color: "#4caf50" }}>
-              Загрузка текста суры...
+            <p className="text-sm font-medium" style={{ color: "#2e7d32" }}>
+              {loadingPage
+                ? `Загрузка... (страница ${loadingPage.current} из ${loadingPage.total})`
+                : "Загрузка текста суры..."}
             </p>
             <p className="text-xs text-center" style={{ color: "#888" }}>
-              Источник: cdn.jsdelivr.net (quran-api)
+              Источник: quran.com
             </p>
           </div>
         )}
@@ -473,58 +799,98 @@ function SurahReadingView({
         {/* Ayahs */}
         {ayahs && !loading && (
           <div className="space-y-0">
-            {ayahs.map((ayah, idx) => (
-              <div
-                key={ayah.number}
-                className="py-4"
-                style={{
-                  borderBottom:
-                    idx < ayahs.length - 1
-                      ? "1px solid rgba(76,175,80,0.12)"
-                      : "none",
-                }}
-                data-ocid={`quran.ayah.item.${ayah.number}`}
-              >
-                {/* Arabic text with ayah number medallion at end */}
+            {ayahs.map((ayah, idx) => {
+              const isActive = playingAyah === ayah.number;
+              return (
                 <div
-                  className="flex items-start gap-2 justify-end mb-2"
-                  style={{ direction: "rtl" }}
+                  key={ayah.number}
+                  className="py-4 transition-all duration-300"
+                  style={{
+                    borderBottom:
+                      idx < ayahs.length - 1
+                        ? "1px solid rgba(76,175,80,0.12)"
+                        : "none",
+                    borderLeft: isActive
+                      ? "3px solid #4caf50"
+                      : "3px solid transparent",
+                    paddingLeft: isActive ? "12px" : "0",
+                    background: isActive
+                      ? "rgba(76,175,80,0.05)"
+                      : "transparent",
+                    borderRadius: isActive ? "0 8px 8px 0" : "0",
+                  }}
+                  data-ocid={`quran.ayah.item.${ayah.number}`}
                 >
-                  <p
-                    className="text-right leading-loose flex-1"
-                    style={{
-                      fontFamily: "serif",
-                      fontSize: "1.5rem",
-                      color: "#1a1a1a",
-                      lineHeight: "2.2",
-                    }}
+                  {/* Arabic text + ayah number medallion + audio button */}
+                  <div
+                    className="flex items-start gap-2 justify-end mb-2"
+                    style={{ direction: "rtl" }}
                   >
-                    {ayah.arabic}
-                  </p>
-                  <div className="mt-2 flex-shrink-0">
-                    <AyahMedallion number={ayah.number} />
-                  </div>
-                </div>
-                {/* Translation */}
-                {ayah.translation && (
-                  <p
-                    className="text-sm leading-relaxed mt-1"
-                    style={{ color: "#5a5a5a", lineHeight: "1.7" }}
-                  >
-                    <span
+                    <p
+                      className="text-right leading-loose flex-1"
                       style={{
-                        color: "#4caf50",
-                        fontWeight: 600,
-                        marginRight: "4px",
+                        fontFamily: "serif",
+                        fontSize: "1.5rem",
+                        color: "#1a1a1a",
+                        lineHeight: "2.2",
                       }}
                     >
-                      {ayah.number}.
-                    </span>
-                    {ayah.translation}
-                  </p>
-                )}
-              </div>
-            ))}
+                      {ayah.arabic}
+                    </p>
+                    <div className="mt-2 flex flex-col items-center gap-1 flex-shrink-0">
+                      <AyahMedallion number={ayah.number} />
+                      {ayah.audioUrl && (
+                        <button
+                          type="button"
+                          className="w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
+                          style={{
+                            background: isActive
+                              ? "#4caf50"
+                              : "rgba(76,175,80,0.15)",
+                            color: isActive ? "#fff" : "#4caf50",
+                            border: "1px solid rgba(76,175,80,0.3)",
+                          }}
+                          onClick={() => {
+                            if (isActive) {
+                              handlePauseAyah();
+                            } else {
+                              handlePlayAyah(ayah.number);
+                            }
+                          }}
+                          title={
+                            isActive
+                              ? "Остановить"
+                              : `Воспроизвести аят ${ayah.number}`
+                          }
+                          data-ocid={`quran.ayah.toggle.${ayah.number}`}
+                        >
+                          {isActive ? <Pause size={10} /> : <Play size={10} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Translation */}
+                  {ayah.translation && (
+                    <p
+                      className="text-sm leading-relaxed mt-1"
+                      style={{ color: "#5a5a5a", lineHeight: "1.7" }}
+                    >
+                      <span
+                        style={{
+                          color: "#4caf50",
+                          fontWeight: 600,
+                          marginRight: "4px",
+                        }}
+                      >
+                        {ayah.number}.
+                      </span>
+                      {ayah.translation}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -532,6 +898,7 @@ function SurahReadingView({
   );
 }
 
+// ─── Main QuranTab component ──────────────────────────────────────────────────
 export default function QuranTab() {
   const [search, setSearch] = useState("");
   const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
@@ -548,7 +915,6 @@ export default function QuranTab() {
     );
   }, [search]);
 
-  // Full reading view
   if (selectedSurah) {
     return (
       <SurahReadingView
@@ -570,7 +936,7 @@ export default function QuranTab() {
           <BookOpen size={16} className="text-islamic-500" />
         </div>
         <p className="text-foreground/40 text-xs">
-          114 сур — на арабском и по-русски
+          114 сур · арабский текст · перевод Кулиева · аудио Алафаси
         </p>
         <div
           className="text-2xl mt-2 text-foreground/20"
@@ -639,8 +1005,15 @@ export default function QuranTab() {
                     {surah.place}
                   </Badge>
                 </div>
-                <div className="text-foreground/40 text-xs">
-                  {surah.transliteration} · {surah.verses} аятов
+                <div className="flex items-center gap-2 text-foreground/40 text-xs">
+                  <span>{surah.transliteration}</span>
+                  <span>·</span>
+                  <span>{surah.verses} аятов</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <Volume2 size={9} />
+                    аудио
+                  </span>
                 </div>
               </div>
 
