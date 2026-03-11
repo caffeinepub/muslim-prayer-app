@@ -6,8 +6,6 @@ import {
   BookOpen,
   ChevronRight,
   Edit,
-  FileUp,
-  Library,
   Loader2,
   Plus,
   Trash2,
@@ -16,7 +14,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SEED_BOOK_IDS, seedBooks } from "../data/seedBooks";
-import IslamHouseBooksManager from "./IslamHouseBooksManager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CustomHadith {
@@ -51,6 +48,7 @@ export interface CustomBook {
   chapters?: CustomChapter[];
   ayahs?: CustomAyah[];
   pdfDataUrl?: string; // base64 data URL for PDF books
+  published?: boolean; // if true, visible to all users; if false/undefined, visible only to admin
 }
 
 // ─── LocalStorage helpers ─────────────────────────────────────────────────────
@@ -102,6 +100,8 @@ export function getCustomBooks(): CustomBook[] {
 function saveCustomBooks(books: CustomBook[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
   localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
+  // Notify other components (e.g. BooksTab) that custom books changed
+  window.dispatchEvent(new Event("custom-books-updated"));
 }
 
 function generateId(): string {
@@ -645,6 +645,26 @@ function BookContentEditor({
     book.chapters ?? [],
   );
   const [ayahs, setAyahs] = useState<CustomAyah[]>(book.ayahs ?? []);
+
+  // Auto-save to parent whenever chapters or ayahs change (skip initial render)
+  const isFirstRender = useRef(true);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  const bookRef = useRef(book);
+  bookRef.current = book;
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const b = bookRef.current;
+    if (b.type === "quran_surah") {
+      onSaveRef.current({ ...b, ayahs });
+    } else if (b.type !== "pdf") {
+      onSaveRef.current({ ...b, chapters });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapters, ayahs]);
 
   // Chapter add/edit state
   const [addingChapter, setAddingChapter] = useState(false);
@@ -1311,104 +1331,22 @@ function BookForm({
   );
 }
 
-// ─── FileUpload helper ────────────────────────────────────────────────────────
-
-function useFileUpload(onImport: (book: CustomBook) => void) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const open = () => inputRef.current?.click();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Reset input so the same file can be re-uploaded if needed
-    e.target.value = "";
-
-    const isPdf =
-      file.name.toLowerCase().endsWith(".pdf") ||
-      file.type === "application/pdf";
-
-    if (!isPdf) {
-      toast.error("Пожалуйста, загрузите файл в формате PDF");
-      return;
-    }
-
-    // Limit to 50 MB
-    const MAX_SIZE = 50 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      toast.error("Файл слишком большой. Максимальный размер — 50 МБ");
-      return;
-    }
-
-    setLoading(true);
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const dataUrl = ev.target?.result as string;
-        const bookName = file.name.replace(/\.pdf$/i, "").trim() || "Книга";
-        const book: CustomBook = {
-          id: generateId(),
-          title: bookName,
-          coverColor:
-            COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)],
-          type: "pdf",
-          pdfDataUrl: dataUrl,
-          chapters: [],
-          ayahs: [],
-        };
-        onImport(book);
-        toast.success(`Книга «${bookName}» загружена`);
-      } catch {
-        toast.error("Не удалось загрузить PDF файл");
-      } finally {
-        setLoading(false);
-      }
-    };
-    reader.onerror = () => {
-      toast.error("Не удалось прочитать файл");
-      setLoading(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const hiddenInput = (
-    <input
-      ref={inputRef}
-      type="file"
-      accept=".pdf,application/pdf"
-      className="hidden"
-      onChange={handleChange}
-      data-ocid="admin.books.upload_button"
-    />
-  );
-
-  return { open, loading, hiddenInput };
-}
-
-// FormatHintDialog removed — PDF upload needs no format hint
-
 // ─── BooksList ────────────────────────────────────────────────────────────────
 function BooksList({
   books,
   onAdd,
-  onImportFile,
   onEdit,
   onEditContent,
   onDelete,
-  onOpenIslamHouse,
+  onPublish,
 }: {
   books: CustomBook[];
   onAdd: () => void;
-  onImportFile: (book: CustomBook) => void;
   onEdit: (b: CustomBook) => void;
   onEditContent: (b: CustomBook) => void;
   onDelete: (id: string) => void;
-  onOpenIslamHouse: () => void;
+  onPublish: (id: string, published: boolean) => void;
 }) {
-  const { open, loading, hiddenInput } = useFileUpload(onImportFile);
   const seedBooks = books.filter((b) => SEED_BOOK_IDS.includes(b.id));
   const customBooksOnly = books.filter((b) => !SEED_BOOK_IDS.includes(b.id));
 
@@ -1466,6 +1404,11 @@ function BooksList({
                 базовая
               </span>
             )}
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${book.published ? "bg-green-500/15 text-green-400" : "bg-gray-500/10 text-gray-400"}`}
+            >
+              {book.published ? "Опубликована" : "Не опубликована"}
+            </span>
           </div>
         </div>
 
@@ -1491,6 +1434,23 @@ function BooksList({
           </button>
           <button
             type="button"
+            onClick={() => onPublish(book.id, !book.published)}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${book.published ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-gray-500/10 text-gray-400 hover:bg-gray-500/20"}`}
+            title={
+              book.published
+                ? "Скрыть от пользователей"
+                : "Опубликовать для всех"
+            }
+            data-ocid={`admin.books.toggle_button.${idx + 1}`}
+          >
+            {book.published ? (
+              <span style={{ fontSize: "11px", fontWeight: "bold" }}>✓</span>
+            ) : (
+              <span style={{ fontSize: "11px" }}>○</span>
+            )}
+          </button>
+          <button
+            type="button"
             onClick={() => onDelete(book.id)}
             className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 hover:bg-red-500/20 transition-colors"
             title="Удалить книгу"
@@ -1505,63 +1465,16 @@ function BooksList({
 
   return (
     <div className="flex-1 px-4 py-4 pb-24 space-y-4">
-      {hiddenInput}
-
-      {/* IslamHouse Books card */}
-      <div
-        className="glass-card rounded-2xl p-4 border border-islamic-500/20"
-        data-ocid="admin.islamhouse.card"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-islamic-500/15 flex items-center justify-center shrink-0">
-              <Library size={16} className="text-islamic-400" />
-            </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">
-                Книги IslamHouse
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Загрузка книг с файлами PDF/EPUB
-              </p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            className="bg-islamic-500/15 border border-islamic-500/30 text-islamic-400 hover:bg-islamic-500/25 text-xs font-semibold shrink-0"
-            variant="outline"
-            onClick={onOpenIslamHouse}
-            data-ocid="admin.islamhouse.open_modal_button"
-          >
-            Управление
-          </Button>
-        </div>
-      </div>
-
       {/* Action buttons row */}
-      <div className="flex gap-2">
+      <div className="flex">
         <Button
-          className="flex-1 bg-islamic-500/15 border border-islamic-500/30 text-islamic-400 hover:bg-islamic-500/25 h-11 font-semibold gap-2"
+          className="w-full bg-islamic-500/15 border border-islamic-500/30 text-islamic-400 hover:bg-islamic-500/25 h-11 font-semibold gap-2"
           variant="outline"
           onClick={onAdd}
           data-ocid="admin.books.add_button"
         >
           <Plus size={16} />
           Добавить
-        </Button>
-        <Button
-          className="flex-1 bg-blue-500/10 border border-blue-500/25 text-blue-400 hover:bg-blue-500/20 h-11 font-semibold gap-2"
-          variant="outline"
-          onClick={open}
-          disabled={loading}
-          data-ocid="admin.books.dropzone"
-        >
-          {loading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <FileUp size={16} />
-          )}
-          Загрузить PDF
         </Button>
       </div>
 
@@ -1634,8 +1547,6 @@ export default function AdminBooksEditor({
   const { pending, ask, confirm, cancel } = useConfirm();
   const [books, setBooks] = useState<CustomBook[]>(() => getCustomBooks());
   const [view, setView] = useState<EditorView>({ type: "list" });
-  const [showIslamHouseManager, setShowIslamHouseManager] = useState(false);
-
   // Persist books to localStorage on change
   useEffect(() => {
     saveCustomBooks(books);
@@ -1652,17 +1563,6 @@ export default function AdminBooksEditor({
       </div>
     );
   }
-
-  // Show IslamHouse books manager
-  if (showIslamHouseManager) {
-    return (
-      <IslamHouseBooksManager onBack={() => setShowIslamHouseManager(false)} />
-    );
-  }
-
-  const handleImportBook = (b: CustomBook) => {
-    setBooks((prev) => [...prev, b]);
-  };
 
   const handleSaveBook = (b: CustomBook) => {
     setBooks((prev) => {
@@ -1682,6 +1582,17 @@ export default function AdminBooksEditor({
 
   const handleSaveContent = (b: CustomBook) => {
     setBooks((prev) => prev.map((x) => (x.id === b.id ? b : x)));
+  };
+
+  const handlePublishBook = (id: string, published: boolean) => {
+    setBooks((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, published } : b)),
+    );
+    toast.success(
+      published
+        ? "Книга опубликована — видна всем пользователям"
+        : "Книга скрыта от пользователей",
+    );
   };
 
   const handleDeleteBook = (id: string) => {
@@ -1731,11 +1642,10 @@ export default function AdminBooksEditor({
             <BooksList
               books={books}
               onAdd={() => setView({ type: "add" })}
-              onImportFile={handleImportBook}
               onEdit={(b) => setView({ type: "edit", book: b })}
               onEditContent={(b) => setView({ type: "content", book: b })}
               onDelete={handleDeleteBook}
-              onOpenIslamHouse={() => setShowIslamHouseManager(true)}
+              onPublish={handlePublishBook}
             />
           </motion.div>
         )}

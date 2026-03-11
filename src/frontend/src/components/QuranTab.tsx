@@ -15,11 +15,9 @@ import { quranFullText } from "../data/quranFullText";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
 
 // ─── API Configuration ────────────────────────────────────────────────────────
-const QURAN_COM_BASE = "https://api.quran.com/api/v4";
-const QURAN_COM_CLIENT_ID = "838d2f27-b48f-449d-be70-771939b581c6";
-const AUDIO_BASE_URL = "https://verses.quran.com/";
-const RECITER_ID = 7; // Mishari Rashid al-Afasy
-const TRANSLATION_ID = 45; // Kuliev Russian
+// Primary: api.alquran.cloud — доступен в России без VPN, единый запрос
+// Fallback: cdn.jsdelivr.net (fawazahmed0/quran-api)
+const CDN_BASE = "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Ayah {
@@ -29,37 +27,13 @@ interface Ayah {
   audioUrl: string | null;
 }
 
-interface QuranComVerse {
-  id: number;
-  verse_number: number;
-  verse_key: string;
-  audio?: { url: string };
-  words?: Array<{ text_uthmani: string; char_type_name?: string }>;
-  translations?: Array<{ id: number; resource_id: number; text: string }>;
+interface FawazAyah {
+  verse: number;
+  text: string;
 }
 
-interface QuranComResponse {
-  verses: QuranComVerse[];
-  pagination: {
-    current_page: number;
-    next_page: number | null;
-    per_page: number;
-    total_records: number;
-    total_pages: number;
-  };
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function stripHtml(html: string): string {
-  return html
-    .replace(/<sup[^>]*>.*?<\/sup>/g, "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function quranComHeaders(): HeadersInit {
-  return { "x-client-id": QURAN_COM_CLIENT_ID };
+interface FawazEditionData {
+  chapter: FawazAyah[];
 }
 
 // ─── Local cache from quranFullText ──────────────────────────────────────────
@@ -77,12 +51,11 @@ for (const surah of quranFullText) {
 }
 
 // ─── Persistent cache via localStorage ───────────────────────────────────────
-const CACHE_V4_PREFIX = "quran_v4_surah_";
-const CACHE_AUDIO_PREFIX = "quran_v4_audio_";
+const CACHE_V5_PREFIX = "quran_v5_surah_";
 
 function getCachedSurah(number: number): Ayah[] | null {
   try {
-    const raw = localStorage.getItem(`${CACHE_V4_PREFIX}${number}`);
+    const raw = localStorage.getItem(`${CACHE_V5_PREFIX}${number}`);
     if (raw) return JSON.parse(raw) as Ayah[];
   } catch {
     /* ignore */
@@ -92,155 +65,80 @@ function getCachedSurah(number: number): Ayah[] | null {
 
 function setCachedSurah(number: number, ayahs: Ayah[]) {
   try {
-    localStorage.setItem(`${CACHE_V4_PREFIX}${number}`, JSON.stringify(ayahs));
+    localStorage.setItem(`${CACHE_V5_PREFIX}${number}`, JSON.stringify(ayahs));
   } catch {
     /* storage full */
   }
 }
 
-function getCachedChapterAudio(number: number): string | null {
-  try {
-    return localStorage.getItem(`${CACHE_AUDIO_PREFIX}${number}`);
-  } catch {
-    return null;
-  }
-}
-
-function setCachedChapterAudio(number: number, url: string) {
-  try {
-    localStorage.setItem(`${CACHE_AUDIO_PREFIX}${number}`, url);
-  } catch {
-    /* storage full */
-  }
-}
-
-// ─── quran.com API fetcher ────────────────────────────────────────────────────
-async function fetchSurahFromQuranCom(
+// ─── api.alquran.cloud fetcher (primary — доступен в России без VPN) ─────────
+async function fetchSurahFromAlquranCloud(
   surahNumber: number,
-  onProgress?: (page: number, total: number) => void,
 ): Promise<Ayah[]> {
-  const allVerses: QuranComVerse[] = [];
-  let page = 1;
-  let totalPages = 1;
-
-  do {
-    const url = `${QURAN_COM_BASE}/verses/by_chapter/${surahNumber}?language=ru&words=true&word_fields=text_uthmani&translations=${TRANSLATION_ID}&audio=${RECITER_ID}&per_page=300&page=${page}`;
-    const res = await fetch(url, { headers: quranComHeaders() });
-    if (!res.ok) throw new Error(`quran.com API error: ${res.status}`);
-    const data: QuranComResponse = await res.json();
-    allVerses.push(...data.verses);
-    totalPages = data.pagination.total_pages;
-    if (onProgress) onProgress(page, totalPages);
-    page = data.pagination.next_page ?? page + 1;
-  } while (page <= totalPages && allVerses.length < 10000);
-
-  return allVerses.map((v) => {
-    // Arabic text: join word texts (filter out end-of-ayah markers)
-    const arabicText = (v.words ?? [])
-      .filter((w) => w.char_type_name !== "end")
-      .map((w) => w.text_uthmani)
-      .join(" ");
-
-    // Translation: first matching translation, strip HTML
-    const translationText = v.translations?.[0]?.text
-      ? stripHtml(v.translations[0].text)
-      : "";
-
-    // Audio URL
-    const audioUrl = v.audio?.url ? `${AUDIO_BASE_URL}${v.audio.url}` : null;
-
+  const url = `https://api.alquran.cloud/v1/surah/${surahNumber}/editions/quran-uthmani,ru.kuliev`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`alquran.cloud error: ${res.status}`);
+  const json = await res.json();
+  // Response: { data: [ {ayahs: [{numberInSurah, text}]}, {ayahs: [{numberInSurah, text}]} ] }
+  const editions: { ayahs: { numberInSurah: number; text: string }[] }[] =
+    json?.data ?? [];
+  if (editions.length < 1) throw new Error("Empty response from alquran.cloud");
+  const arabicAyahs = editions[0]?.ayahs ?? [];
+  const ruAyahs = editions[1]?.ayahs ?? [];
+  const ruMap: Record<number, string> = {};
+  for (const a of ruAyahs) {
+    ruMap[a.numberInSurah] = a.text;
+  }
+  return arabicAyahs.map((a) => {
+    const surahPad = String(surahNumber).padStart(3, "0");
+    const ayahPad = String(a.numberInSurah).padStart(3, "0");
     return {
-      number: v.verse_number,
-      arabic: arabicText,
-      translation: translationText,
-      audioUrl,
+      number: a.numberInSurah,
+      arabic: a.text,
+      translation: ruMap[a.numberInSurah] ?? "",
+      audioUrl: `https://everyayah.com/data/Alafasy_128kbps/${surahPad}${ayahPad}.mp3`,
     };
   });
 }
 
-async function fetchChapterAudio(surahNumber: number): Promise<string | null> {
-  const cached = getCachedChapterAudio(surahNumber);
-  if (cached) return cached;
-  try {
-    const res = await fetch(
-      `${QURAN_COM_BASE}/chapter_recitations/${RECITER_ID}/${surahNumber}`,
-      { headers: quranComHeaders() },
-    );
-    if (!res.ok) return null;
-    const data: { audio_file: { audio_url: string } } = await res.json();
-    const audioUrl = data.audio_file?.audio_url ?? null;
-    if (audioUrl) setCachedChapterAudio(surahNumber, audioUrl);
-    return audioUrl;
-  } catch {
-    return null;
-  }
-}
+// ─── jsdelivr CDN fetcher (fallback) ─────────────────────────────────────────
+async function fetchSurahFromCDN(surahNumber: number): Promise<Ayah[]> {
+  const arabicUrl = `${CDN_BASE}/ara-quranindopak/${surahNumber}.json`;
+  const russianUrl = `${CDN_BASE}/rus-kuliyev/${surahNumber}.json`;
 
-// ─── Fallback: fawazahmed0 CDN ────────────────────────────────────────────────
-type QuranCDNData = Record<string, Record<string, string>>;
-let _arFullCache: QuranCDNData | null = null;
-let _ruFullCache: QuranCDNData | null = null;
-const CACHE_KEY_AR_FULL = "quran_cdn_arabic_full";
-const CACHE_KEY_RU_FULL = "quran_cdn_russian_full";
+  const [arabicRes, russianRes] = await Promise.all([
+    fetch(arabicUrl),
+    fetch(russianUrl),
+  ]);
 
-function loadCDNFromStorage(key: string): QuranCDNData | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as QuranCDNData;
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
+  if (!arabicRes.ok) throw new Error(`CDN Arabic error: ${arabicRes.status}`);
 
-function saveCDNToStorage(key: string, data: QuranCDNData) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    /* storage full */
-  }
-}
-
-async function fetchFromCDNFallback(surahNumber: number): Promise<Ayah[]> {
-  if (!_arFullCache || !_ruFullCache) {
-    const cachedAr = loadCDNFromStorage(CACHE_KEY_AR_FULL);
-    const cachedRu = loadCDNFromStorage(CACHE_KEY_RU_FULL);
-    if (cachedAr && cachedRu) {
-      _arFullCache = cachedAr;
-      _ruFullCache = cachedRu;
-    } else {
-      const [arRes, ruRes] = await Promise.all([
-        fetch(
-          "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/ara.json",
-          { cache: "force-cache" },
-        ),
-        fetch(
-          "https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1/editions/rus-kuliev.json",
-          { cache: "force-cache" },
-        ),
-      ]);
-      if (!arRes.ok || !ruRes.ok) throw new Error("CDN fetch failed");
-      const [arData, ruData] = await Promise.all([arRes.json(), ruRes.json()]);
-      _arFullCache = arData as QuranCDNData;
-      _ruFullCache = ruData as QuranCDNData;
-      saveCDNToStorage(CACHE_KEY_AR_FULL, _arFullCache);
-      saveCDNToStorage(CACHE_KEY_RU_FULL, _ruFullCache);
+  const arabicData: FawazEditionData = await arabicRes.json();
+  let ruMap: Record<number, string> = {};
+  if (russianRes.ok) {
+    const russianData: FawazEditionData = await russianRes.json();
+    for (const a of russianData.chapter) {
+      ruMap[a.verse] = a.text;
     }
   }
-  const arSurah = _arFullCache?.[String(surahNumber)] ?? {};
-  const ruSurah = _ruFullCache?.[String(surahNumber)] ?? {};
-  return Object.entries(arSurah).map(([k, arabic]) => ({
-    number: Number(k),
-    arabic,
-    translation: ruSurah[k] ?? "",
-    audioUrl: null,
-  }));
+
+  return arabicData.chapter.map((a) => {
+    const ayahNum = a.verse;
+    const surahPad = String(surahNumber).padStart(3, "0");
+    const ayahPad = String(ayahNum).padStart(3, "0");
+    return {
+      number: ayahNum,
+      arabic: a.text,
+      translation: ruMap[ayahNum] ?? "",
+      audioUrl: `https://everyayah.com/data/Alafasy_128kbps/${surahPad}${ayahPad}.mp3`,
+    };
+  });
 }
 
 // ─── Main fetch function with fallback chain ──────────────────────────────────
 async function fetchSurahAyahs(
   surah: Surah,
-  onProgress?: (page: number, total: number) => void,
+  _onProgress?: (page: number, total: number) => void,
 ): Promise<Ayah[]> {
   // 1. Local complete data
   if (localCompleteAyahs[surah.number]) {
@@ -251,21 +149,35 @@ async function fetchSurahAyahs(
   if (cached && cached.length >= surah.verses) {
     return cached;
   }
-  // 3. quran.com API (primary)
+  // 3. api.alquran.cloud (primary — доступен в России без VPN)
   try {
-    const ayahs = await fetchSurahFromQuranCom(surah.number, onProgress);
+    const ayahs = await fetchSurahFromAlquranCloud(surah.number);
     if (ayahs.length > 0) {
       setCachedSurah(surah.number, ayahs);
       return ayahs;
     }
   } catch {
-    /* fall through */
+    /* fall through to CDN fallback */
   }
-  // 4. CDN fallback
-  const cdnAyahs = await fetchFromCDNFallback(surah.number);
-  if (cdnAyahs.length > 0) {
-    setCachedSurah(surah.number, cdnAyahs);
-    return cdnAyahs;
+  // 4. jsdelivr CDN fallback
+  try {
+    const ayahs = await fetchSurahFromCDN(surah.number);
+    if (ayahs.length > 0) {
+      setCachedSurah(surah.number, ayahs);
+      return ayahs;
+    }
+  } catch {
+    /* fall through to local fallback */
+  }
+  // 5. Local fallback (partial data if available)
+  const partial = quranFullText.find((s) => s.number === surah.number);
+  if (partial && partial.ayahs.length > 0) {
+    return partial.ayahs.map((a) => ({
+      number: a.n,
+      arabic: a.ar,
+      translation: a.ru,
+      audioUrl: null,
+    }));
   }
   throw new Error("All sources failed");
 }
@@ -414,7 +326,6 @@ function AudioPlayerBar({
       }}
       data-ocid="quran.audio.panel"
     >
-      {/* Full surah play/pause */}
       <button
         type="button"
         className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 active:scale-95"
@@ -466,56 +377,33 @@ function SurahReadingView({
 }: { surah: Surah; onBack: () => void }) {
   const [ayahs, setAyahs] = useState<Ayah[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingPage, setLoadingPage] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Audio state
   const [playingAyah, setPlayingAyah] = useState<number | null>(null);
   const [isPlayingFull, setIsPlayingFull] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
   const ayahAudioRef = useRef<HTMLAudioElement | null>(null);
   const fullAudioRef = useRef<HTMLAudioElement | null>(null);
-  const chapterAudioUrlRef = useRef<string | null>(null);
   const playingAyahRef = useRef<number | null>(null);
 
-  // Load ayahs
-  // biome-ignore lint/correctness/useExhaustiveDependencies: surah is a stable prop object; we intentionally key on number only
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on number only
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
-      setLoadingPage(null);
       try {
-        const fetched = await fetchSurahAyahs(surah, (page, total) => {
-          if (!cancelled) setLoadingPage({ current: page, total });
-        });
+        const fetched = await fetchSurahAyahs(surah);
         if (!cancelled) {
           setAyahs(fetched);
-          setLoadingPage(null);
         }
       } catch {
         if (!cancelled) {
-          const partial = quranFullText.find((s) => s.number === surah.number);
-          if (partial && partial.ayahs.length > 0) {
-            setAyahs(
-              partial.ayahs.map((a) => ({
-                number: a.n,
-                arabic: a.ar,
-                translation: a.ru,
-                audioUrl: null,
-              })),
-            );
-          } else {
-            setError(
-              "Не удалось загрузить текст суры. Проверьте подключение к интернету.",
-            );
-          }
+          setError(
+            "Не удалось загрузить текст суры. Проверьте подключение к интернету.",
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -528,14 +416,6 @@ function SurahReadingView({
     };
   }, [surah.number]);
 
-  // Pre-fetch chapter audio URL in background
-  useEffect(() => {
-    fetchChapterAudio(surah.number).then((url) => {
-      chapterAudioUrlRef.current = url;
-    });
-  }, [surah.number]);
-
-  // Cleanup audio on unmount
   useEffect(() => {
     return () => {
       ayahAudioRef.current?.pause();
@@ -543,7 +423,6 @@ function SurahReadingView({
     };
   }, []);
 
-  // ── Audio handlers ──
   function stopAllAudio() {
     ayahAudioRef.current?.pause();
     if (ayahAudioRef.current) {
@@ -558,35 +437,6 @@ function SurahReadingView({
     setPlayingAyah(null);
     setIsPlayingFull(false);
     playingAyahRef.current = null;
-  }
-
-  function playFullSurah() {
-    stopAllAudio();
-    const url = chapterAudioUrlRef.current;
-    if (!url) {
-      // fallback: play ayahs sequentially
-      if (ayahs && ayahs.length > 0 && ayahs[0].audioUrl) {
-        playAyahSequentially(ayahs, 0);
-      }
-      return;
-    }
-    const audio = new Audio(url);
-    audio.muted = isMuted;
-    fullAudioRef.current = audio;
-    setIsPlayingFull(true);
-    audio.play().catch(() => setIsPlayingFull(false));
-    audio.onended = () => {
-      setIsPlayingFull(false);
-      fullAudioRef.current = null;
-    };
-    audio.onerror = () => {
-      setIsPlayingFull(false);
-      fullAudioRef.current = null;
-      // fallback to sequential
-      if (ayahs && ayahs.length > 0 && ayahs[0].audioUrl) {
-        playAyahSequentially(ayahs, 0);
-      }
-    };
   }
 
   function playAyahSequentially(allAyahs: Ayah[], index: number) {
@@ -612,7 +462,10 @@ function SurahReadingView({
   }
 
   function handlePlayFull() {
-    playFullSurah();
+    stopAllAudio();
+    if (ayahs && ayahs.length > 0) {
+      playAyahSequentially(ayahs, 0);
+    }
   }
 
   function handlePauseFull() {
@@ -626,11 +479,9 @@ function SurahReadingView({
   function handlePlayAyah(ayahNumber: number) {
     const ayah = ayahs?.find((a) => a.number === ayahNumber);
     if (!ayah?.audioUrl) return;
-
     stopAllAudio();
     setPlayingAyah(ayahNumber);
     playingAyahRef.current = ayahNumber;
-
     const audio = new Audio(ayah.audioUrl);
     audio.muted = isMuted;
     ayahAudioRef.current = audio;
@@ -709,10 +560,8 @@ function SurahReadingView({
 
       {/* Scrollable content */}
       <div className="flex-1 px-4 py-5 pb-24">
-        {/* Surah header ornament */}
         <SurahOrnament name={surah.arabic} />
 
-        {/* Basmala */}
         {surah.number !== 1 && surah.number !== 9 && (
           <div
             className="text-center text-2xl my-6 leading-loose"
@@ -722,7 +571,6 @@ function SurahReadingView({
           </div>
         )}
 
-        {/* Info row */}
         <div className="flex items-center justify-center gap-3 mb-4">
           <span
             className="text-xs px-3 py-1 rounded-full font-medium"
@@ -746,7 +594,6 @@ function SurahReadingView({
           </span>
         </div>
 
-        {/* Audio player bar */}
         {ayahs && !loading && (
           <AudioPlayerBar
             surahName={surah.nameRu}
@@ -770,12 +617,10 @@ function SurahReadingView({
               style={{ color: "#4caf50" }}
             />
             <p className="text-sm font-medium" style={{ color: "#2e7d32" }}>
-              {loadingPage
-                ? `Загрузка... (страница ${loadingPage.current} из ${loadingPage.total})`
-                : "Загрузка текста суры..."}
+              Загрузка текста суры...
             </p>
             <p className="text-xs text-center" style={{ color: "#888" }}>
-              Источник: quran.com
+              Источник: api.alquran.cloud
             </p>
           </div>
         )}
@@ -821,7 +666,6 @@ function SurahReadingView({
                   }}
                   data-ocid={`quran.ayah.item.${ayah.number}`}
                 >
-                  {/* Arabic text + ayah number medallion + audio button */}
                   <div
                     className="flex items-start gap-2 justify-end mb-2"
                     style={{ direction: "rtl" }}
@@ -870,7 +714,6 @@ function SurahReadingView({
                     </div>
                   </div>
 
-                  {/* Translation */}
                   {ayah.translation && (
                     <p
                       className="text-sm leading-relaxed mt-1"
@@ -985,14 +828,12 @@ export default function QuranTab() {
               onClick={() => setSelectedSurah(surah)}
               data-ocid={`quran.surah.item.${surah.number}`}
             >
-              {/* Number badge */}
               <div className="w-9 h-9 rounded-lg bg-islamic-500/10 border border-islamic-500/20 flex items-center justify-center shrink-0">
                 <span className="text-xs font-bold text-islamic-400">
                   {surah.number}
                 </span>
               </div>
 
-              {/* Names */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-foreground font-semibold text-sm truncate">
@@ -1017,7 +858,6 @@ export default function QuranTab() {
                 </div>
               </div>
 
-              {/* Arabic name */}
               <div
                 className="text-lg font-bold text-foreground/70 group-hover:text-islamic-400 transition-colors shrink-0"
                 style={{ fontFamily: "serif", direction: "rtl" }}

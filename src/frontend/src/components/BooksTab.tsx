@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, BookOpen, BookText, Loader2, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  BookText,
+  ChevronRight,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -16,7 +23,8 @@ import { quranFullText } from "../data/quranFullText";
 import { type Surah, quranSurahs } from "../data/quranSurahs";
 import { tr, useLanguage } from "../hooks/useLanguage";
 import { playBookOpen } from "../utils/sounds";
-import type { CustomBook } from "./AdminBooksEditor";
+import { type CustomBook, getCustomBooks } from "./AdminBooksEditor";
+import HadithView from "./HadithView";
 import { IslamHouseFileViewer } from "./IslamHouseBooksManager";
 
 // ─────────────────────────────────────────────
@@ -3406,6 +3414,7 @@ type BookView =
   | "muslima"
   | "time"
   | "encyclopedia"
+  | "hadith"
   | "custom"
   | "pdf";
 
@@ -3413,6 +3422,26 @@ export default function BooksTab() {
   const [view, setView] = useState<BookView>("shelf");
   const [selectedCustomBook, setSelectedCustomBook] =
     useState<CustomBook | null>(null);
+  // Custom admin books (published ones shown to all, all shown to admin)
+  const isAdmin = sessionStorage.getItem("author_session") === "1";
+  const [customBooks, setCustomBooks] = useState<CustomBook[]>(() => {
+    const all = getCustomBooks();
+    return isAdmin ? all : all.filter((b) => b.published);
+  });
+  // Refresh custom books when storage changes (admin publishes/edits)
+  useEffect(() => {
+    const refresh = () => {
+      const admin = sessionStorage.getItem("author_session") === "1";
+      const all = getCustomBooks();
+      setCustomBooks(admin ? all : all.filter((b) => b.published));
+    };
+    window.addEventListener("storage", refresh);
+    window.addEventListener("custom-books-updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("custom-books-updated", refresh);
+    };
+  }, []);
   // IslamHouse books — lightweight meta only
   const [islamHouseBooks, setIslamHouseBooks] = useState<IslamHouseBookMeta[]>(
     () => getIslamHouseBooksMeta(),
@@ -3555,6 +3584,7 @@ export default function BooksTab() {
         ocidPrefix="time"
       />
     );
+  if (view === "hadith") return <HadithView onBack={() => setView("shelf")} />;
   if (view === "encyclopedia")
     return <EncyclopediaView onBack={() => setView("shelf")} />;
 
@@ -4166,6 +4196,93 @@ export default function BooksTab() {
             setView,
           })}
         </div>
+
+        {/* ── Custom Admin Books ── */}
+        {customBooks.filter(
+          (b) => (b.chapters?.length ?? 0) > 0 || (b.ayahs?.length ?? 0) > 0,
+        ).length > 0 && (
+          <>
+            <div className="mt-6 mb-3 flex items-center gap-2">
+              <div className="h-px flex-1 bg-islamic-500/10" />
+              <span className="text-xs text-muted-foreground/50 font-medium px-2">
+                Добавленные книги
+              </span>
+              <div className="h-px flex-1 bg-islamic-500/10" />
+            </div>
+            {customBooks
+              .filter(
+                (b) =>
+                  (b.chapters?.length ?? 0) > 0 || (b.ayahs?.length ?? 0) > 0,
+              )
+              .map((book, idx) => (
+                <button
+                  key={book.id}
+                  type="button"
+                  className="w-full glass-card rounded-2xl overflow-hidden text-left mb-4 transition-all duration-200 active:scale-[0.98]"
+                  style={{ border: `1px solid ${book.coverColor}33` }}
+                  onClick={() => {
+                    playBookOpen();
+                    setSelectedCustomBook(book);
+                    setView("custom");
+                  }}
+                  data-ocid={`books.custom.item.${idx + 1}`}
+                >
+                  <div
+                    className="flex items-center gap-4 px-5 py-4"
+                    style={{
+                      background: `linear-gradient(135deg, ${book.coverColor}cc 0%, ${book.coverColor}88 100%)`,
+                    }}
+                  >
+                    <div
+                      className="w-12 h-16 rounded-xl flex items-center justify-center shrink-0 relative overflow-hidden"
+                      style={{
+                        background: "rgba(255,255,255,0.12)",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                      }}
+                    >
+                      <BookOpen size={18} className="text-white/80" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-white leading-snug">
+                        {book.title}
+                      </p>
+                      {book.titleArabic && (
+                        <p
+                          className="text-xs text-white/60 mt-0.5"
+                          style={{ direction: "rtl", fontFamily: "serif" }}
+                        >
+                          {book.titleArabic}
+                        </p>
+                      )}
+                      {book.description && (
+                        <p className="text-xs text-white/50 mt-1 line-clamp-2">
+                          {book.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/60">
+                          {book.type === "hadith"
+                            ? "Хадисы"
+                            : book.type === "quran_surah"
+                              ? "Сура"
+                              : "Книга"}
+                        </span>
+                        <span className="text-[10px] text-white/40">
+                          {book.type === "quran_surah"
+                            ? `${book.ayahs?.length ?? 0} аятов`
+                            : `${book.chapters?.length ?? 0} глав`}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      className="text-white/40 shrink-0"
+                    />
+                  </div>
+                </button>
+              ))}
+          </>
+        )}
 
         {/* ── IslamHouse Books ── */}
         {islamHouseBooks.length > 0 && (
